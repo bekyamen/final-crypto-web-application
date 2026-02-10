@@ -1,0 +1,199 @@
+export const tradeEngine = new TradeEngine();
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User model with trading balance
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  fundsPassword String?
+  firstName     String
+  lastName      String
+  phoneNumber   String?
+  role          UserRole @default(USER)
+
+  // Trading related
+  balance        Float @default(0)
+  totalInvested  Float @default(0)
+  totalEarnings  Float @default(0)
+
+  trades   Trade[]
+  wallets  UserWallet[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([role])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// User crypto wallets model
+model UserWallet {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cryptoSymbol     String // BTC, ETH, etc
+  quantity         Float  @default(0)
+  averageBuyPrice  Float  @default(0)
+  totalInvested    Float  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, cryptoSymbol])
+  @@index([userId])
+}
+
+// Trade model with scheduling
+model Trade {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        TradeType // BUY or SELL
+  cryptoSymbol String // BTC, ETH, etc
+  amountUSD   Float // Amount in USD
+  quantity    Float? // Calculated quantity
+
+  // Pricing
+  entryPrice  Float? // Price when trade was placed
+  exitPrice   Float? // Price when trade executed
+
+  // Scheduling
+  scheduledTime DateTime // When trade should execute
+  executedAt    DateTime? // When trade actually executed
+
+  // Outcome control
+  status            TradeStatus @default(SCHEDULED)
+  outcome           TradeOutcome? // WIN, LOSS, or NEUTRAL
+  profitLoss        Float? // Profit or loss amount
+  profitLossPercent Float? // P&L percentage
+
+  // Admin override
+  isForced         Boolean @default(false)
+  forcedOutcome    TradeOutcome?
+  forcedProfitLoss Float?
+
+  // Metadata
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([scheduledTime])
+  @@index([status])
+  @@index([cryptoSymbol])
+}
+
+enum TradeType {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  SCHEDULED
+  EXECUTED
+  CANCELLED
+  FAILED
+}
+
+enum TradeOutcome {
+  WIN
+  LOSS
+  NEUTRAL
+}
+
+// Admin settings for trade outcomes
+model TradingSettings {
+  id String @id @default(cuid())
+
+  // Win/Loss control
+  winPercentage     Float @default(60) // 60% chance of winning
+  lossPercentage    Float @default(30) // 30% chance of losing
+  neutralPercentage Float @default(10) // 10% chance of neutral
+
+  // Random outcome toggle
+  useRandomOutcome Boolean @default(true)
+
+  // Price variation
+  priceVariation Float @default(2) // +/- 2% price variation
+
+  // Trading hours
+  tradingEnabled Boolean @default(true)
+  minTradeAmount Float @default(10)
+  maxTradeAmount Float @default(100000)
+
+  // Admin control
+  adminOverride Boolean @default(false) // Admin can override outcomes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Audit log for admin actions
+model AuditLog {
+  id String @id @default(cuid())
+
+  adminId      String
+  action       String // USER_BALANCE_ADJUSTED, TRADE_FORCED, etc
+  targetUserId String? // User affected by action
+
+  entityType String? // User, Trade, Settings
+  entityId   String?
+  changes    Json? // Before/After changes
+  reason     String?
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetUserId])
+  @@index([action])
+}
+
+// Crypto price cache model
+model CryptoPrice {
+  id String @id @default(cuid())
+
+  symbol          String @unique
+  price           Float
+  marketCap       Float?
+  volume24h       Float?
+  priceChange24h  Float?
+
+  lastUpdated DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([symbol])
+}
+
+// Trade execution log (for debugging/history)
+model TradeExecution {
+  id String @id @default(cuid())
+
+  tradeId String
+  executionTime DateTime @default(now())
+  status String // SUCCESS, FAILED, SCHEDULED
+  reason String?
+  priceAtExecution Float?
+  calculatedOutcome TradeOutcome?
+
+  createdAt DateTime @default(now())
+
+  @@index([tradeId])
+}
