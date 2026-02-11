@@ -11,10 +11,11 @@ interface EnvironmentConfig {
   jwtExpiration: string;
   coinGeckoApiUrl: string;
   coinGeckoApiKey: string;
-  corsOrigin: string;
+  corsOrigin: string[]; // <--- change from string to string[]
   adminEmail: string;
   adminPassword: string;
 }
+
 
 const getEnvironmentConfig = (): EnvironmentConfig => {
   const {
@@ -26,18 +27,16 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     JWT_EXPIRATION = '7d',
     COINGECKO_API_URL = 'https://api.coingecko.com/api/v3',
     COINGECKO_API_KEY = '',
-    CORS_ORIGIN = 'http://localhost:3000',
+    CORS_ORIGIN = 'http://localhost:3000,https://admin.bitorynfx.com',
     ADMIN_EMAIL,
     ADMIN_PASSWORD,
   } = process.env;
 
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not set');
-  }
+  if (!DATABASE_URL) throw new Error('DATABASE_URL environment variable is not set');
+  if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set');
 
-  if (!JWT_SECRET) {
-    throw new Error('JWT_SECRET environment variable is not set');
-  }
+  // Split comma-separated string into array
+  const allowedOrigins = CORS_ORIGIN.split(',');
 
   return {
     nodeEnv: NODE_ENV,
@@ -48,10 +47,11 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     jwtExpiration: JWT_EXPIRATION,
     coinGeckoApiUrl: COINGECKO_API_URL,
     coinGeckoApiKey: COINGECKO_API_KEY,
-    corsOrigin: CORS_ORIGIN,
+    corsOrigin: allowedOrigins,
     adminEmail: ADMIN_EMAIL || 'admin@crypto.local',
     adminPassword: ADMIN_PASSWORD || 'admin123456',
   };
 };
+
 
 export const config = getEnvironmentConfig();
