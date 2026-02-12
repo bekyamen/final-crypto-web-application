@@ -1,7 +1,7 @@
 import express, { Express, Request, Response } from 'express';
 
 import cors from 'cors';
-import { config } from './config/environment';
+
 import { errorHandler } from './middlewares/errorMiddleware';
 import authRouter from './routes/authRoutes';
 import portfolioRouter from './routes/portfolioRoutes';
