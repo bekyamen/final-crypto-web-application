@@ -29,9 +29,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || config.corsOrigin.includes(origin)) {
+      const allowedOrigins = [
+        'http://localhost:3000',   // dev frontend
+        'https://bitorynfx.com',   // production frontend
+      ];
+
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.log('[CORS] Blocked origin:', origin);
         callback(new Error('CORS not allowed'));
       }
     },
@@ -40,6 +46,8 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
+
+
 
 
 // Health check route
