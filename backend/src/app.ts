@@ -30,9 +30,11 @@ app.use(
   cors({
     origin: (origin, callback) => {
       const allowedOrigins = [
-        'http://localhost:3000',   // dev frontend
-        'https://bitorynfx.com',   // production frontend
-      ];
+  'http://localhost:3000',         // dev
+  'https://bitorynfx.com',         // main frontend
+  'https://admin.bitorynfx.com',   // admin frontend
+];
+
 
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
