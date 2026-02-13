@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { AppError, createErrorResponse } from '../utils/errors';
 
+
 /**
  * Global error handler middleware
  */
@@ -18,6 +19,7 @@ export const errorHandler = (
     const formattedErrors = error.errors.map((err) => ({
       field: err.path.join('.'),
       message: err.message,
+      
     }));
 
     res.status(400).json({
@@ -43,6 +45,8 @@ export const errorHandler = (
   });
 };
 
+
+
 /**
  * Async handler to wrap async route handlers and pass errors to errorHandler
  */
@@ -51,3 +55,4 @@ export const asyncHandler =
   (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
+

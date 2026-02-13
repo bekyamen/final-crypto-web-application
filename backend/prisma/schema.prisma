@@ -10,6 +10,83 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum DepositStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DepositRequest {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  walletId String?
+  wallet   DepositWallet? @relation(fields: [walletId], references: [id])
+
+  coin            String
+  amount          Float
+  transactionHash String
+  proofImage      String?
+
+  status DepositStatus @default(PENDING)
+
+  reviewedBy String?
+  reviewer   User?   @relation("DepositReviewedBy", fields: [reviewedBy], references: [id])
+
+  reviewNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model DepositWallet {
+  id       String  @id @default(cuid())
+  coin     String  @unique
+  address  String
+  qrImage  String
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  depositRequests DepositRequest[] // ✅ ADD THIS
+
+  @@index([coin])
+}
+
+enum WithdrawStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model WithdrawRequest {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  coin       String
+  network    String
+  address    String
+  amount     Float
+  fee        Float        @default(0)
+
+  status     WithdrawStatus @default(PENDING)
+
+  reviewedBy String?
+  reviewer   User?          @relation("WithdrawReviewedBy", fields: [reviewedBy], references: [id])
+
+  reviewNote String?
+
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+
 // User model for authentication and authorization
 model User {
   id            String        @id @default(cuid())
@@ -37,9 +114,15 @@ model User {
   updatedAt DateTime   @updatedAt
   AuditLog  AuditLog[]
 
+  depositRequests  DepositRequest[]
+  reviewedDeposits DepositRequest[] @relation("DepositReviewedBy")
+
   @@index([email])
   @@index([phoneNumber])
   @@index([role])
+
+  withdrawRequests WithdrawRequest[]
+  reviewedWithdrawals WithdrawRequest[] @relation("WithdrawReviewedBy")
 }
 
 model AdminContact {

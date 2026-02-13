@@ -1,7 +1,7 @@
 import express, { Express, Request, Response } from 'express';
 
 import cors from 'cors';
-
+import path from "path"
 import { errorHandler } from './middlewares/errorMiddleware';
 import authRouter from './routes/authRoutes';
 import portfolioRouter from './routes/portfolioRoutes';
@@ -12,9 +12,10 @@ import { tradeRouter } from './routes/tradeRoutes';
 import { adminTradeRouter } from './routes/tradeAdminRoutes';
 import adminSimRouter from './routes/adminSimRoutes';
 import superAdminRouter from './routes/superadminroute';
-
-
-
+import adminDepositRoutes from "./routes/adminDepositRoutes"
+import userDepositRoutes from "./routes/userDepositRoutes"
+import adminWithdrawRoutes from "./routes/admin.withdraw.routes";
+import userWithdrawRoutes from "./routes/user.withdraw.routes";
 
 import tradeSimRouter from './routes/tradeSimRoutes'; 
 import contactRouter from './routes/contactRoutes';
@@ -24,6 +25,7 @@ const app: Express = express();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 
 // CORS Configuration
 app.use(
@@ -49,6 +51,7 @@ app.use(
   }),
 );
 
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")))
 
 
 
@@ -73,6 +76,13 @@ app.use('/api/trade-sim', tradeSimRouter);
 app.use('/api/admin', adminSimRouter);
 app.use('/api/contacts', contactRouter);
 app.use('/api/super-admin', superAdminRouter);
+
+app.use("/api/admin/deposit", adminDepositRoutes); // only SUPER_ADMIN route
+app.use("/api/user/deposit", userDepositRoutes)
+
+app.use("/api/admin/withdraw", adminWithdrawRoutes);
+app.use("/api/user/withdraw", userWithdrawRoutes);
+
 
 
 

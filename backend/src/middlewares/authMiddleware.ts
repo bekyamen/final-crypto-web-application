@@ -1,79 +1,44 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken, JwtPayload } from '../utils/jwt';
-import { UnauthorizedError } from '../utils/errors';
-
-
 
 export interface AuthRequest extends Request {
-  user?: JwtPayload;
+  user?: JwtPayload & { role: string };
 }
 
-
-
+// Auth middleware
 export const authMiddleware = (
   req: AuthRequest,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ): void => {
   try {
     const authHeader = req.headers.authorization;
 
-
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedError('No token provided');
+      res.status(401).json({
+        success: false,
+        message: 'No token provided',
+        errorCode: 'UNAUTHORIZED',
+      });
+      return; // explicitly return to satisfy TS
     }
 
-    const token = authHeader.slice(7); // Remove "Bearer " prefix
-    const decoded = verifyToken(token);
-  
+    const token = authHeader.slice(7);
+    const decoded = verifyToken(token) as JwtPayload & { role: string };
+
     req.user = decoded;
-    next();
-  } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      res.status(401).json({
-        success: false,
-        message: error.message,
-        errorCode: error.errorCode,
-      });
-    } else {
-      res.status(401).json({
-        success: false,
-        message: 'Invalid or expired token',
-        errorCode: 'INVALID_TOKEN',
-      });
-    }
-  }
-};
-
-
-
-export const adminMiddleware = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction,
-): void => {
-  if (!req.user) {
+    return next(); // explicitly return next()
+  } catch (err) {
     res.status(401).json({
       success: false,
-      message: 'Authentication required',
-      errorCode: 'UNAUTHORIZED',
+      message: 'Invalid or expired token',
+      errorCode: 'INVALID_TOKEN',
     });
-    return;
+    return; // explicitly return
   }
-
-  if (req.user.role !== 'ADMIN') {
-    res.status(403).json({
-      success: false,
-      message: 'Admin access required',
-      errorCode: 'FORBIDDEN',
-    });
-    return;
-  }
-
-  next();
 };
 
+// Role-based access middleware
 export const roleMiddleware = (roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
@@ -94,6 +59,6 @@ export const roleMiddleware = (roles: string[]) => {
       return;
     }
 
-    next();
+    return next();
   };
 };

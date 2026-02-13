@@ -1,0 +1,308 @@
+import { Request, Response } from "express";
+import { PrismaClient, DepositStatus } from "@prisma/client";
+import fs from "fs";
+import path from "path";
+import { AuthRequest } from "../middlewares/authMiddleware";
+
+const prisma = new PrismaClient();
+
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
+
+const allowedCoins = ["BTC", "ETH", "USDT"];
+
+/**
+ * =====================================================
+ * ADMIN: Create or Update Deposit Wallet
+ * =====================================================
+ */
+export const setDepositWallet = async (
+  req: MulterRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { coin, address } = req.body;
+
+    if (!coin || !allowedCoins.includes(coin)) {
+      res.status(400).json({ success: false, message: "Invalid coin type" });
+      return;
+    }
+
+    if (!address) {
+      res.status(400).json({ success: false, message: "Wallet address required" });
+      return;
+    }
+
+    if (!req.file) {
+      res.status(400).json({ success: false, message: "QR image required" });
+      return;
+    }
+
+    const existingWallet = await prisma.depositWallet.findUnique({
+      where: { coin },
+    });
+
+    if (existingWallet?.qrImage) {
+      const oldImagePath = path.join(process.cwd(), existingWallet.qrImage);
+      if (fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
+      }
+    }
+
+    const wallet = await prisma.depositWallet.upsert({
+      where: { coin },
+      update: {
+        address,
+        qrImage: `uploads/qr/${req.file.filename}`,
+      },
+      create: {
+        coin,
+        address,
+        qrImage: `uploads/qr/${req.file.filename}`,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `${coin} wallet saved successfully`,
+      data: wallet,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * =====================================================
+ * USER: Get Deposit Wallet
+ * =====================================================
+ */
+export const getDepositWallet = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { coin } = req.params;
+
+    if (!coin || !allowedCoins.includes(coin)) {
+      res.status(400).json({ success: false, message: "Invalid coin type" });
+      return;
+    }
+
+    const wallet = await prisma.depositWallet.findUnique({
+      where: { coin },
+    });
+
+    if (!wallet || !wallet.isActive) {
+      res.status(404).json({ success: false, message: "Wallet not available" });
+      return;
+    }
+
+    const qrImageUrl = `${req.protocol}://${req.get("host")}/${wallet.qrImage}`;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        coin: wallet.coin,
+        address: wallet.address,
+        qrImage: qrImageUrl,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * =====================================================
+ * USER: Create Deposit Request
+ * POST /api/user/deposit/request
+ * =====================================================
+ */
+export const createDepositRequest = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { coin, amount, transactionHash } = req.body;
+
+    if (!coin || !allowedCoins.includes(coin)) {
+      res.status(400).json({ success: false, message: "Invalid coin" });
+      return;
+    }
+
+    if (!amount || Number(amount) <= 0) {
+      res.status(400).json({ success: false, message: "Invalid amount" });
+      return;
+    }
+
+    if (!transactionHash) {
+      res.status(400).json({ success: false, message: "Transaction hash required" });
+      return;
+    }
+
+    // Prevent duplicate transaction
+    const existing = await prisma.depositRequest.findFirst({
+      where: { transactionHash },
+    });
+
+    if (existing) {
+      res.status(400).json({
+        success: false,
+        message: "This transaction hash was already submitted",
+      });
+      return;
+    }
+
+    const wallet = await prisma.depositWallet.findUnique({
+      where: { coin },
+    });
+
+    if (!wallet || !wallet.isActive) {
+      res.status(404).json({
+        success: false,
+        message: "Deposit wallet not available",
+      });
+      return;
+    }
+
+    const deposit = await prisma.depositRequest.create({
+      data: {
+        userId: req.user!.id,
+        walletId: wallet.id,
+        coin,
+        amount: Number(amount),
+        transactionHash,
+        proofImage: req.file?.path,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Deposit request submitted successfully",
+      data: deposit,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * =====================================================
+ * ADMIN: Get Pending Deposits
+ * =====================================================
+ */
+export const getPendingDeposits = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const deposits = await prisma.depositRequest.findMany({
+      where: { status: DepositStatus.PENDING },
+      include: { user: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.status(200).json({ success: true, data: deposits });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * =====================================================
+ * ADMIN: Approve Deposit
+ * =====================================================
+ */
+export const approveDeposit = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const deposit = await prisma.depositRequest.findUnique({ where: { id } });
+
+    if (!deposit || deposit.status !== DepositStatus.PENDING) {
+      res.status(404).json({
+        success: false,
+        message: "Deposit not found or already processed",
+      });
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.depositRequest.update({
+        where: { id },
+        data: {
+          status: DepositStatus.APPROVED,
+          reviewedBy: req.user!.id,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: deposit.userId },
+        data: {
+          balance: { increment: deposit.amount },
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          userId: deposit.userId,
+          coinId: deposit.coin,
+          coinName: deposit.coin,
+          coinSymbol: deposit.coin,
+          type: "DEPOSIT",
+          quantity: deposit.amount,
+          price: 1,
+          total: deposit.amount,
+          fee: 0,
+          notes: "Crypto deposit approved",
+        },
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Deposit approved successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * =====================================================
+ * ADMIN: Reject Deposit
+ * =====================================================
+ */
+export const rejectDeposit = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    await prisma.depositRequest.update({
+      where: { id },
+      data: {
+        status: DepositStatus.REJECTED,
+        reviewedBy: req.user!.id,
+        reviewNote: reason,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Deposit rejected",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
