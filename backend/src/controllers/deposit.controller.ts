@@ -6,16 +6,16 @@ import { AuthRequest } from "../middlewares/authMiddleware";
 
 const prisma = new PrismaClient();
 
-interface MulterRequest extends Request {
+interface MulterRequest extends AuthRequest {
   file?: Express.Multer.File;
 }
 
 const allowedCoins = ["BTC", "ETH", "USDT"];
 
 /**
- * =====================================================
- * ADMIN: Create or Update Deposit Wallet
- * =====================================================
+ * ===============================
+ * ADMIN: Create / Update Wallet
+ * ===============================
  */
 export const setDepositWallet = async (
   req: MulterRequest,
@@ -75,9 +75,9 @@ export const setDepositWallet = async (
 };
 
 /**
- * =====================================================
+ * ===============================
  * USER: Get Deposit Wallet
- * =====================================================
+ * ===============================
  */
 export const getDepositWallet = async (
   req: Request,
@@ -117,10 +117,9 @@ export const getDepositWallet = async (
 };
 
 /**
- * =====================================================
+ * ===============================
  * USER: Create Deposit Request
- * POST /api/user/deposit/request
- * =====================================================
+ * ===============================
  */
 export const createDepositRequest = async (
   req: AuthRequest,
@@ -144,7 +143,6 @@ export const createDepositRequest = async (
       return;
     }
 
-    // Prevent duplicate transaction
     const existing = await prisma.depositRequest.findFirst({
       where: { transactionHash },
     });
@@ -152,7 +150,7 @@ export const createDepositRequest = async (
     if (existing) {
       res.status(400).json({
         success: false,
-        message: "This transaction hash was already submitted",
+        message: "Transaction hash already submitted",
       });
       return;
     }
@@ -176,13 +174,12 @@ export const createDepositRequest = async (
         coin,
         amount: Number(amount),
         transactionHash,
-        proofImage: req.file?.path,
       },
     });
 
     res.status(201).json({
       success: true,
-      message: "Deposit request submitted successfully",
+      message: "Deposit request submitted",
       data: deposit,
     });
   } catch (error) {
@@ -192,12 +189,12 @@ export const createDepositRequest = async (
 };
 
 /**
- * =====================================================
+ * ===============================
  * ADMIN: Get Pending Deposits
- * =====================================================
+ * ===============================
  */
 export const getPendingDeposits = async (
-  req: Request,
+  _req: Request,
   res: Response
 ): Promise<void> => {
   try {
@@ -214,9 +211,9 @@ export const getPendingDeposits = async (
 };
 
 /**
- * =====================================================
+ * ===============================
  * ADMIN: Approve Deposit
- * =====================================================
+ * ===============================
  */
 export const approveDeposit = async (
   req: AuthRequest,
@@ -250,21 +247,6 @@ export const approveDeposit = async (
           balance: { increment: deposit.amount },
         },
       });
-
-      await tx.transaction.create({
-        data: {
-          userId: deposit.userId,
-          coinId: deposit.coin,
-          coinName: deposit.coin,
-          coinSymbol: deposit.coin,
-          type: "DEPOSIT",
-          quantity: deposit.amount,
-          price: 1,
-          total: deposit.amount,
-          fee: 0,
-          notes: "Crypto deposit approved",
-        },
-      });
     });
 
     res.status(200).json({
@@ -277,9 +259,9 @@ export const approveDeposit = async (
 };
 
 /**
- * =====================================================
+ * ===============================
  * ADMIN: Reject Deposit
- * =====================================================
+ * ===============================
  */
 export const rejectDeposit = async (
   req: AuthRequest,
@@ -294,7 +276,7 @@ export const rejectDeposit = async (
       data: {
         status: DepositStatus.REJECTED,
         reviewedBy: req.user!.id,
-        reviewNote: reason,
+        reviewNote: reason || "Rejected by admin",
       },
     });
 

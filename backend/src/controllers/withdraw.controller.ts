@@ -1,9 +1,8 @@
-import { Request, Response } from "express";
+import { Response } from "express"; // removed unused Request
 import { PrismaClient } from "@prisma/client";
 import { AuthRequest } from "../middlewares/authMiddleware";
 
 const prisma = new PrismaClient();
-
 const allowedCoins = ["BTC", "ETH", "USDT", "XRP", "BNB"];
 
 /**
@@ -26,16 +25,14 @@ export const createWithdrawRequest = async (req: AuthRequest, res: Response) => 
       return res.status(400).json({ success: false, message: "Invalid withdrawal amount" });
     }
 
-    // Get user's current balance
     const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    const fee = 0.0005; // Example fixed fee; you can make it dynamic per coin/network
+    const fee = 0.0005;
     if (user.balance < Number(amount) + fee) {
       return res.status(400).json({ success: false, message: "Insufficient balance" });
     }
 
-    // Create withdrawal request
     const withdrawRequest = await prisma.withdrawRequest.create({
       data: {
         userId: req.user!.id,
@@ -61,7 +58,7 @@ export const createWithdrawRequest = async (req: AuthRequest, res: Response) => 
 /**
  * ADMIN: Get Pending Withdrawals
  */
-export const getPendingWithdrawals = async (req: AuthRequest, res: Response) => {
+export const getPendingWithdrawals = async (_req: AuthRequest, res: Response) => {
   try {
     const withdrawals = await prisma.withdrawRequest.findMany({
       where: { status: "PENDING" },
@@ -88,13 +85,11 @@ export const approveWithdrawal = async (req: AuthRequest, res: Response) => {
     }
 
     await prisma.$transaction(async (tx) => {
-      // Deduct amount + fee from user balance
       await tx.user.update({
         where: { id: withdrawal.userId },
         data: { balance: { decrement: withdrawal.amount + withdrawal.fee } },
       });
 
-      // Mark withdrawal as approved
       await tx.withdrawRequest.update({
         where: { id },
         data: { status: "APPROVED", reviewedBy: req.user!.id },

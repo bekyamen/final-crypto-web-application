@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { AppError, createErrorResponse } from '../utils/errors';
 
 
+
 /**
  * Global error handler middleware
  */
@@ -19,7 +20,7 @@ export const errorHandler = (
     const formattedErrors = error.errors.map((err) => ({
       field: err.path.join('.'),
       message: err.message,
-      
+
     }));
 
     res.status(400).json({
@@ -31,6 +32,8 @@ export const errorHandler = (
     return;
   }
 
+
+  
   // Handle custom AppError instances
   if (error instanceof AppError) {
     res.status(error.statusCode).json(createErrorResponse(error));
