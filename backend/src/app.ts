@@ -20,6 +20,11 @@ import userWithdrawRoutes from "./routes/user.withdraw.routes";
 import tradeSimRouter from './routes/tradeSimRoutes'; 
 import contactRouter from './routes/contactRoutes';
 
+import addbalanceRoutes from './routes/add.balance.route';
+import userbalanceRoutes from './routes/user.balance.route';
+
+import  getAdminBalanceHistory  from './routes/adminHistoryRoutes';
+
 const app: Express = express();
 
 // Middleware
@@ -82,8 +87,9 @@ app.use("/api/user/deposit", userDepositRoutes)
 
 app.use("/api/admin/withdraw", adminWithdrawRoutes);
 app.use("/api/user/withdraw", userWithdrawRoutes);
-
-
+app.use("/api/admin", addbalanceRoutes); // Admin route to add balance
+app.use("/api", userbalanceRoutes); // User route to get own balance
+app.use("/api/admin", getAdminBalanceHistory); // Admin route to get balance addition history
 
 
 // Documentation route
