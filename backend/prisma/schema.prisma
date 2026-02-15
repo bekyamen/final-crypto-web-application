@@ -65,27 +65,26 @@ enum WithdrawStatus {
 }
 
 model WithdrawRequest {
-  id         String        @id @default(cuid())
-  userId     String
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  coin       String
-  network    String
-  address    String
-  amount     Float
-  fee        Float        @default(0)
+  coin    String
+  network String
+  address String
+  amount  Float
+  fee     Float  @default(0)
 
-  status     WithdrawStatus @default(PENDING)
+  status WithdrawStatus @default(PENDING)
 
   reviewedBy String?
-  reviewer   User?          @relation("WithdrawReviewedBy", fields: [reviewedBy], references: [id])
+  reviewer   User?   @relation("WithdrawReviewedBy", fields: [reviewedBy], references: [id])
 
   reviewNote String?
 
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
-
 
 // User model for authentication and authorization
 model User {
@@ -110,19 +109,21 @@ model User {
   trades        Trade[]
   userWallets   UserWallet[]
 
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  AuditLog  AuditLog[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   depositRequests  DepositRequest[]
   reviewedDeposits DepositRequest[] @relation("DepositReviewedBy")
 
+  withdrawRequests    WithdrawRequest[]
+  reviewedWithdrawals WithdrawRequest[] @relation("WithdrawReviewedBy")
+
+  adminLogs      AuditLog[] @relation("AdminLogs")
+  targetUserLogs AuditLog[] @relation("TargetUserLogs")
+
   @@index([email])
   @@index([phoneNumber])
   @@index([role])
-
-  withdrawRequests WithdrawRequest[]
-  reviewedWithdrawals WithdrawRequest[] @relation("WithdrawReviewedBy")
 }
 
 model AdminContact {
@@ -238,8 +239,8 @@ model AuditLog {
   reason       String?
   createdAt    DateTime @default(now())
 
-  // Just reference the userId, no back relation required
-  admin User @relation(fields: [adminId], references: [id])
+  admin      User  @relation("AdminLogs", fields: [adminId], references: [id])
+  targetUser User? @relation("TargetUserLogs", fields: [targetUserId], references: [id])
 
   @@index([adminId])
   @@index([targetUserId])

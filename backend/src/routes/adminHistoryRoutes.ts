@@ -1,16 +1,15 @@
 import express from "express";
-import { getAdminBalanceHistory } from "../controllers/getAdminBalanceHistory";
+import { getAddBalanceHistory } from "../controllers/adminHistoryController";
 import { authMiddleware, roleMiddleware } from "../middlewares/authMiddleware";
 import { UserRole } from "@prisma/client";
 
 const router = express.Router();
 
-// GET: Admin balance addition history
 router.get(
-  "/users/balance-history",
+  "/balance-history",
   authMiddleware,
   roleMiddleware([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
-  getAdminBalanceHistory
+  getAddBalanceHistory
 );
 
 export default router;
