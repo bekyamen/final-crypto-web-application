@@ -1,5 +1,6 @@
 import { Trade, AdminSettings, AdminMode, UserOverride, BetConfig } from '../types/trade.types';
 
+
 class TradeStore {
   private trades: Map<string, Trade> = new Map();
   private adminSettings: AdminSettings = {
@@ -7,15 +8,18 @@ class TradeStore {
     winProbability: 60,
     userOverrides: new Map(),
   };
+
+
+  
   private betConfig: BetConfig = {
-    30: { profitPercent: 75, lossPercent: 75 },
-    60: { profitPercent: 18, lossPercent: 18 },
-    120: { profitPercent: 95, lossPercent: 95 },
-    180: { profitPercent: 50, lossPercent: 50 },
-    240: { profitPercent: 40, lossPercent: 40 },
-    300: { profitPercent: 120, lossPercent: 120 },
-    360: { profitPercent: 35, lossPercent: 35 },
-  };
+  30: { profitPercent: 12, lossPercent: 100 },   // 30s → 12%
+  60: { profitPercent: 15, lossPercent: 100 },   // 60s → 15%
+  90: { profitPercent: 18, lossPercent: 100 },   // 90s → 18%
+  120: { profitPercent: 21, lossPercent: 100 },  // 120s → 21%
+  180: { profitPercent: 24, lossPercent: 100 },  // 180s → 24%
+  360: { profitPercent: 27, lossPercent: 100 },  // 360s → 27%
+}
+
 
   // Trade operations
   addTrade(trade: Trade): void {
