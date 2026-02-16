@@ -104,6 +104,7 @@ model User {
 
   // Trading related
   balance       Float        @default(0)
+  demoBalance   Float         @default(0) // ✅ Add this field
   totalInvested Float        @default(0)
   totalEarnings Float        @default(0)
   trades        Trade[]
@@ -116,6 +117,7 @@ model User {
   reviewedDeposits DepositRequest[] @relation("DepositReviewedBy")
 
   withdrawRequests    WithdrawRequest[]
+  
   reviewedWithdrawals WithdrawRequest[] @relation("WithdrawReviewedBy")
 
   adminLogs      AuditLog[] @relation("AdminLogs")

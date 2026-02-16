@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 
 /**
  * ===============================
- * USER: Get Own Balance
+ * USER: Get Own Demo Balance
  * ===============================
  */
-export const getUserBalance = async (
+export const getUserDemoBalance = async (
   req: AuthRequest,
   res: Response
 ): Promise<void> => {
@@ -24,13 +24,13 @@ export const getUserBalance = async (
 
     const userId = req.user.id;
 
-    // Fetch only the user's balance
+    // Fetch only the user's demo balance
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
-        balance: true, // only return balance
+        demoBalance: true, // ✅ return demo balance instead of real balance
       },
     });
 
@@ -44,7 +44,7 @@ export const getUserBalance = async (
 
     res.status(200).json({
       success: true,
-      message: "User balance fetched successfully",
+      message: "User demo balance fetched successfully",
       data: user,
     });
   } catch (error) {

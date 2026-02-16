@@ -12,3 +12,4 @@ router.get("/wallet/:coin", authMiddleware, getDepositWallet);
 router.post("/request", authMiddleware, upload.single("proofImage"), createDepositRequest);
 
 export default router;
+

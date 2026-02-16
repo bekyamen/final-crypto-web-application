@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 
 /**
  * =====================================
- * ADMIN: Get Balance Addition History
+ * ADMIN: Get Demo Balance Addition History
  * =====================================
  */
-export const getAddBalanceHistory = async (
+export const getDemoBalanceHistory = async (
   req: AuthRequest,
   res: Response
 ): Promise<void> => {
@@ -35,7 +35,7 @@ export const getAddBalanceHistory = async (
 
     const history = await prisma.auditLog.findMany({
       where: {
-        action: "ADMIN_ADD_BALANCE",
+        action: "ADMIN_ADD_DEMO_BALANCE", // ✅ only demo balance actions
       },
       include: {
         admin: {
@@ -48,7 +48,7 @@ export const getAddBalanceHistory = async (
           select: {
             id: true,
             email: true,
-            balance: true,
+            demoBalance: true, // ✅ include demoBalance
           },
         },
       },
