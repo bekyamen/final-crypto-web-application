@@ -25,42 +25,44 @@ interface UpdateSettingsInput {
 }
 
 class TradeAdminService {
-  async adjustUserBalance(input: AdjustBalanceInput): Promise<any> {
-    const { userId, amount, reason, adminId } = input;
+ async adjustUserBalance(input: AdjustBalanceInput): Promise<any> {
+  const { userId, amount, reason, adminId } = input;
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundError('User');
-    }
-
-    const newBalance = user.balance + amount;
-
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: { balance: newBalance },
-    });
-
-    // Log audit
-    await this.logAuditAction({
-      adminId,
-      action: 'BALANCE_ADJUSTED',
-      targetUserId: userId,
-      changes: {
-        before: user.balance,
-        after: newBalance,
-        amount,
-      },
-      reason,
-    });
-
-    return {
-      userId: updatedUser.id,
-      previousBalance: user.balance,
-      newBalance: updatedUser.balance,
-      adjustment: amount,
-      reason,
-    };
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new NotFoundError('User');
   }
+
+  const previousBalance = Number(user.balance);
+  const newBalance = Number(amount); // ✅ SET directly
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { balance: newBalance },
+  });
+
+  // Log audit
+  await this.logAuditAction({
+    adminId,
+    action: 'BALANCE_SET',
+    targetUserId: userId,
+    changes: {
+      before: previousBalance,
+      after: newBalance,
+      difference: newBalance - previousBalance,
+    },
+    reason,
+  });
+
+  return {
+    userId: updatedUser.id,
+    previousBalance,
+    newBalance: updatedUser.balance,
+    difference: newBalance - previousBalance,
+    reason,
+  };
+}
+
 
   async resetUserPassword(userId: string, newPassword: string, adminId: string): Promise<any> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
