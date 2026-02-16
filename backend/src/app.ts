@@ -37,9 +37,11 @@ app.use(
   cors({
     origin: (origin, callback) => {
       const allowedOrigins = [
-  'http://localhost:3000',         // dev
+  'http://localhost:3000',
+  'http://localhost:8080',         // dev
   'https://bitorynfx.com',         // main frontend
-  'https://admin.bitorynfx.com',   // admin frontend
+  'https://admin.bitorynfx.com',
+  'https://super-admin.bitorynfx.com',   // admin frontend
 ];
 
 
@@ -56,7 +58,10 @@ app.use(
   }),
 );
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")))
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads')) // __dirname points to src/
+)
 
 
 
