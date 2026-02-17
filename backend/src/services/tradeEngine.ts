@@ -4,8 +4,21 @@ import { Trade, TradeRequest, TradeOutcome, ExpirationTime } from '../types/trad
 import { tradeStore } from '../stores/tradeStore';
 
 export class TradeEngine {
-  ALLOWED_EXPIRATION_TIMES = [30, 60, 120, 180, 240, 300, 360];
+  // Allowed expiration times and their profit/loss percentages
+  private PERCENTAGE_MAP: Record<number, number> = {
+    30: 0.12,
+    60: 0.15,
+    90: 0.18,
+    120: 0.21,
+    180: 0.24,
+    360: 0.27,
+  };
 
+  ALLOWED_EXPIRATION_TIMES = Object.keys(this.PERCENTAGE_MAP).map(Number);
+
+  /**
+   * Decide if trade is WIN or LOSE
+   */
   calculateOutcome(userId: string): TradeOutcome {
     const adminSettings = tradeStore.getAdminSettings();
 
@@ -21,36 +34,35 @@ export class TradeEngine {
     return randomValue <= adminSettings.winProbability ? 'WIN' : 'LOSE';
   }
 
+  /**
+   * Calculate profit/loss based on amount, expiration, and outcome
+   * ✅ Symmetric: Win +%, Lose -%
+   * ✅ Never return full amount
+   */
   calculateReturnedAmount(
     amount: number,
     expirationTime: ExpirationTime,
     outcome: TradeOutcome,
   ) {
-    const betConfig = tradeStore.getBetConfig();
-    const config = betConfig[expirationTime];
+    const percent = this.PERCENTAGE_MAP[expirationTime];
+    if (!percent) throw new Error('Invalid expiration time');
 
-    if (!config) throw new Error('Invalid expiration time');
+    const profitLossAmount = amount * percent;
+    const profitLossPercent = percent * 100; // store as %
 
-    let profitLossAmount = 0;
-    let profitLossPercent = 0;
-
-    if (outcome === 'WIN') {
-      profitLossPercent = config.profitPercent;
-      profitLossAmount = amount * (config.profitPercent / 100);
-    } else {
-      profitLossPercent = -config.lossPercent;
-      profitLossAmount = -amount * (config.lossPercent / 100);
-    }
-
-    const returnedAmount = amount + profitLossAmount;
+    // Symmetric: WIN adds, LOSE subtracts
+    const balanceChange = outcome === 'WIN' ? profitLossAmount : -profitLossAmount;
 
     return {
-      returnedAmount: Math.max(0, returnedAmount),
-      profitLossAmount,
-      profitLossPercent,
+      returnedAmount: balanceChange, // this is the change to balance
+      profitLossAmount: balanceChange,
+      profitLossPercent: outcome === 'WIN' ? profitLossPercent : -profitLossPercent,
     };
   }
 
+  /**
+   * Execute trade, store result
+   */
   executeTrade(tradeRequest: TradeRequest): Trade {
     const tradeId = uuidv4();
     const outcome = this.calculateOutcome(tradeRequest.userId);
@@ -74,6 +86,9 @@ export class TradeEngine {
       completedAt: new Date(),
     };
 
+    // Update user balance by ±profitLossAmount
+    tradeStore.updateUserBalance(tradeRequest.userId, result.profitLossAmount);
+
     tradeStore.addTrade(trade);
     return trade;
   }
@@ -82,15 +97,11 @@ export class TradeEngine {
     return tradeStore.getAllTrades();
   }
 
-    deleteUser(userId: string) {
+  deleteUser(userId: string) {
     const deletedTrades = tradeStore.deleteUserTrades(userId);
-
-    return {
-      userId,
-      deletedTrades,
-    };
+    return { userId, deletedTrades };
   }
-  
+
   getUserTrades(userId: string) {
     return tradeStore.getUserTrades(userId);
   }
@@ -111,23 +122,14 @@ export class TradeEngine {
     tradeStore.setWinProbability(percentage);
   }
 
-  setUserOverride(
-    userId: string,
-    forceOutcome: 'win' | 'lose' | null,
-    expiresAt?: Date,
-  ) {
+  setUserOverride(userId: string, forceOutcome: 'win' | 'lose' | null, expiresAt?: Date) {
     tradeStore.setUserOverride(userId, forceOutcome, expiresAt);
   }
 
-  updateBetConfig(
-    expirationTime: number,
-    profitPercent: number,
-    lossPercent: number,
-  ) {
+  updateBetConfig(expirationTime: number, profitPercent: number, lossPercent: number) {
     if (!this.ALLOWED_EXPIRATION_TIMES.includes(expirationTime)) {
       throw new Error('Invalid expiration time');
     }
-
     tradeStore.updateBetConfig(expirationTime, profitPercent, lossPercent);
   }
 

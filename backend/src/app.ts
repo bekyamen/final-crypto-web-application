@@ -16,7 +16,7 @@ import adminDepositRoutes from "./routes/adminDepositRoutes"
 import userDepositRoutes from "./routes/userDepositRoutes"
 import adminWithdrawRoutes from "./routes/admin.withdraw.routes";
 import userWithdrawRoutes from "./routes/user.withdraw.routes";
-
+import  getuserReallbalance  from './routes/trade userRoutes';
 import tradeSimRouter from './routes/tradeSimRoutes'; 
 import contactRouter from './routes/contactRoutes';
 
@@ -96,6 +96,7 @@ app.use("/api/admin", addbalanceRoutes); // Admin route to add balance
 app.use("/api", userbalanceRoutes); // User route to get own balance
 app.use("/api/admin", getAdminBalanceHistory); // Admin route to get balance addition history
 
+app.use("/api/user", getuserReallbalance); // User route to get own real balance
 
 // Documentation route
 app.get('/api', (_req: Request, res: Response) => {

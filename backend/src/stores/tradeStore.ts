@@ -3,6 +3,7 @@ import { Trade, AdminSettings, AdminMode, UserOverride, BetConfig } from '../typ
 
 class TradeStore {
   private trades: Map<string, Trade> = new Map();
+  private userBalances: Map<string, number> = new Map();
   private adminSettings: AdminSettings = {
     globalMode: 'random',
     winProbability: 60,
@@ -26,9 +27,9 @@ class TradeStore {
     this.trades.set(trade.id, trade);
   }
 
-  getTrade(tradeId: string): Trade | undefined {
-    return this.trades.get(tradeId);
-  }
+ getUserBalance(userId: string): number {
+  return this.userBalances.get(userId) || 0;
+}
 
   getAllTrades(): Trade[] {
     return Array.from(this.trades.values());
@@ -37,6 +38,14 @@ class TradeStore {
   getUserTrades(userId: string): Trade[] {
     return Array.from(this.trades.values()).filter(t => t.userId === userId);
   }
+
+  updateUserBalance(userId: string, delta: number): void {
+  const current = this.userBalances.get(userId) || 0;
+  const newBalance = current + delta;
+
+  // Never allow negative balance
+  this.userBalances.set(userId, Math.max(0, newBalance));
+}
 
   /**
    * ✅ DELETE ALL TRADES FOR A USER
