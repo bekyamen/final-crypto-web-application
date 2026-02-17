@@ -1,16 +1,21 @@
 import express from "express";
-import { addDemoBalanceToAllUsers } from "../controllers/Add Balance Controller";
+import { setDemoBalanceForAllUsers } from "../controllers/Add Balance Controller";
 import { authMiddleware, roleMiddleware } from "../middlewares/authMiddleware";
 import { UserRole } from "@prisma/client";
 
 const router = express.Router();
 
-// Add demo balance for all users
+/**
+ * @route POST /users/demo-balance/all
+ * @desc  Admin sets or adds demo balance for all users
+ * @body  { amount: number, reason?: string, mode: "add" | "set" }
+ * @access Admin / Super Admin
+ */
 router.post(
-  "/users/add-demo-balance/all",
+  "/users/demo-balance/all",
   authMiddleware,
   roleMiddleware([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
-  addDemoBalanceToAllUsers
+  setDemoBalanceForAllUsers
 );
 
 export default router;

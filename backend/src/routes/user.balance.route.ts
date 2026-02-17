@@ -1,10 +1,14 @@
 import express from "express";
-import { getUserDemoBalance } from "../controllers/getUserBalance"; 
+import { getUserDemoBalance } from "../controllers/getUserBalance";
 import { authMiddleware } from "../middlewares/authMiddleware";
 
 const router = express.Router();
 
-// User fetches their own demo balance
+/**
+ * @route   GET /users/balance
+ * @desc    Fetch logged-in user's demo balance
+ * @access  Authenticated users
+ */
 router.get("/users/balance", authMiddleware, getUserDemoBalance);
 
 export default router;

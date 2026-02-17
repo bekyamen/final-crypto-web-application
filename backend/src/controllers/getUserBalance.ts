@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, UserRole } from "@prisma/client";
 import { AuthRequest } from "../middlewares/authMiddleware";
 
 const prisma = new PrismaClient();
@@ -23,14 +23,16 @@ export const getUserDemoBalance = async (
     }
 
     const userId = req.user.id;
+    const isAdminRequest = req.user.role === UserRole.ADMIN || req.user.role === UserRole.SUPER_ADMIN;
 
-    // Fetch only the user's demo balance
+    // Fetch demo balance (optionally more data for admin)
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
         email: true,
-        demoBalance: true, // ✅ return demo balance instead of real balance
+        demoBalance: true,
+        ...(isAdminRequest && { role: true }), // admin can see role
       },
     });
 

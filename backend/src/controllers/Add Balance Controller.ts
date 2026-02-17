@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 
 /**
  * ===============================
- * ADMIN: Add Demo Balance to All Users
+ * ADMIN: Set or Add Demo Balance for All Users
  * ===============================
  */
-export const addDemoBalanceToAllUsers = async (
+export const setDemoBalanceForAllUsers = async (
   req: AuthRequest,
   res: Response
 ): Promise<void> => {
@@ -28,11 +28,17 @@ export const addDemoBalanceToAllUsers = async (
       return;
     }
 
-    const { amount, reason } = req.body;
+    const { amount, reason, mode } = req.body; // mode: "set" | "add"
 
     // ✅ Validate amount
-    if (!amount || Number(amount) <= 0) {
+    if (amount === undefined || Number(amount) < 0) {
       res.status(400).json({ success: false, message: "Invalid amount" });
+      return;
+    }
+
+    // Validate mode
+    if (mode !== "set" && mode !== "add") {
+      res.status(400).json({ success: false, message: "Invalid mode, must be 'set' or 'add'" });
       return;
     }
 
@@ -47,10 +53,17 @@ export const addDemoBalanceToAllUsers = async (
     // 🔹 Transaction-safe update
     await prisma.$transaction(async (tx) => {
       for (const user of users) {
-        // Update only demoBalance
+        let newBalance: number;
+
+        if (mode === "add") {
+          newBalance = (user.demoBalance ?? 0) + Number(amount);
+        } else {
+          newBalance = Number(amount);
+        }
+
         const updatedUser = await tx.user.update({
           where: { id: user.id },
-          data: { demoBalance: { increment: Number(amount) } },
+          data: { demoBalance: newBalance },
         });
 
         // Optional: Create a demo "transaction" log
@@ -61,10 +74,10 @@ export const addDemoBalanceToAllUsers = async (
             coinName: "USD Demo",
             coinSymbol: "USD_DEMO",
             type: TransactionType.DEPOSIT,
-            quantity: Number(amount),
+            quantity: mode === "add" ? Number(amount) : newBalance,
             price: 1,
-            total: Number(amount),
-            notes: reason || "Admin demo balance addition",
+            total: mode === "add" ? Number(amount) : newBalance,
+            notes: reason || `Admin demo balance ${mode === "add" ? "addition" : "set"}`,
           },
         });
 
@@ -72,13 +85,14 @@ export const addDemoBalanceToAllUsers = async (
         await tx.auditLog.create({
           data: {
             adminId,
-            action: "ADMIN_ADD_DEMO_BALANCE",
+            action: mode === "add" ? "ADMIN_ADD_DEMO_BALANCE" : "ADMIN_SET_DEMO_BALANCE",
             targetUserId: user.id,
             entityType: "User",
             entityId: user.id,
             changes: {
-              amountAdded: Number(amount),
+              previousBalance: user.demoBalance,
               newDemoBalance: updatedUser.demoBalance,
+              amount: Number(amount),
             },
             reason,
           },
@@ -88,7 +102,10 @@ export const addDemoBalanceToAllUsers = async (
 
     res.status(200).json({
       success: true,
-      message: `Demo balance of ${amount} added for ${users.length} users`,
+      message:
+        mode === "add"
+          ? `Demo balance of ${amount} added for ${users.length} users`
+          : `Demo balance set to ${amount} for ${users.length} users`,
     });
   } catch (error) {
     console.error(error);
