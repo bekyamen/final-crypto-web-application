@@ -37,8 +37,8 @@ export function toPrismaTradeOutcome(outcome: TradeOutcome): PrismaTradeOutcome 
   switch (outcome) {
     case 'WIN':
       return PrismaTradeOutcome.WIN;
-    case 'LOSE':
-      return PrismaTradeOutcome.LOSS;
+    case 'LOSS':
+      return PrismaTradeOutcome.LOSS; // ✅ fixed
     default:
       throw new Error(`Invalid trade outcome: ${outcome}`);
   }
@@ -52,10 +52,10 @@ export function fromPrismaTradeOutcome(outcome: PrismaTradeOutcome | null | unde
     case PrismaTradeOutcome.WIN:
       return 'WIN';
     case PrismaTradeOutcome.LOSS:
-      return 'LOSE';
+      return 'LOSS'; // ✅ fixed
     case undefined:
     case null:
-      return 'LOSE'; // default fallback
+      return 'LOSS'; // default fallback
     default:
       throw new Error(`Invalid Prisma trade outcome: ${outcome}`);
   }

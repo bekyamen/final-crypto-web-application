@@ -1,13 +1,15 @@
 export type TradeType = 'buy' | 'sell';
-export type TradeOutcome = 'WIN' | 'LOSE';
-export type AdminMode = 'win' | 'lose' | 'random';
+export type TradeOutcome = 'WIN' | 'LOSS' | 'NEUTRAL';
+
+export type AdminMode = 'WIN' | 'LOSS' | 'RANDOM';
+
 export type ExpirationTime = 30 | 60 | 120 | 300; // seconds
 
 export interface Trade {
   id: string;
   userId: string;
   type: TradeType;
-  asset: string;
+  asset: string | { symbol: string };
   amount: number;
   expirationTime: ExpirationTime;
   outcome: TradeOutcome;
@@ -21,7 +23,7 @@ export interface Trade {
 export interface TradeRequest {
   userId: string;
   type: TradeType;
-  asset: string;
+  asset: string | { symbol: string };
   amount: number;
   expirationTime: ExpirationTime;
 }
@@ -38,6 +40,7 @@ export interface TradeResponse {
   profitLossAmount: number;
   profitLossPercent: number;
   timestamp: Date;
+  newBalance?: number;
 }
 
 export interface UserOverride {
@@ -58,4 +61,3 @@ export interface BetConfig {
     lossPercent: number;
   };
 }
-

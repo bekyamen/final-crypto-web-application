@@ -272,31 +272,27 @@ model Trade {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type         TradeType // BUY or SELL
-  cryptoSymbol String // BTC, ETH, etc
-  amountUSD    Float // Amount in USD
-  quantity     Float? // Calculated quantity
+  type          TradeType
+  cryptoSymbol  String   // ✅ FIXED
+  amountUSD     Float
+  quantity      Float?
 
-  // Pricing
-  entryPrice Float? // Price when trade was placed
-  exitPrice  Float? // Price when trade executed
+  entryPrice Float? 
+  exitPrice  Float?
 
-  // Scheduling
-  scheduledTime DateTime // When trade should execute
-  executedAt    DateTime? // When trade actually executed
+  scheduledTime DateTime
+  executedAt    DateTime?
+  expirationTime Int?
 
-  // Outcome control
   status            TradeStatus   @default(SCHEDULED)
-  outcome           TradeOutcome? // WIN, LOSS, or NEUTRAL
-  profitLoss        Float? // Profit or loss amount
-  profitLossPercent Float? // P&L percentage
+  outcome           TradeOutcome?
+  profitLoss        Float?
+  profitLossPercent Float?
 
-  // Admin override
   isForced         Boolean       @default(false)
   forcedOutcome    TradeOutcome?
   forcedProfitLoss Float?
 
-  // Metadata
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -306,6 +302,7 @@ model Trade {
   @@index([status])
   @@index([cryptoSymbol])
 }
+
 
 enum TradeType {
   BUY
@@ -333,7 +330,9 @@ model TradingSettings {
   winPercentage     Float @default(60) // 60% chance of winning
   lossPercentage    Float @default(30) // 30% chance of losing
   neutralPercentage Float @default(10) // 10% chance of neutral
-
+  
+  globalMode      String  @default("random") // win, lose, random
+  winProbability  Int     @default(60)
   // Random outcome toggle
   useRandomOutcome Boolean @default(true)
 
@@ -350,6 +349,13 @@ model TradingSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UserOverride {
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  forceOutcome String? // win or lose
+  expiresAt    DateTime?
 }
 
 // Crypto price cache

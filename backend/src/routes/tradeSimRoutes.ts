@@ -9,6 +9,7 @@ export const tradeSimRouter = Router();
  * @body { userId, type, asset, amount, expirationTime }
  * @returns Trade result with outcome and returned amount
  */
+
 tradeSimRouter.post('/', tradeSimController.createTrade);
 
 /**
@@ -17,6 +18,7 @@ tradeSimRouter.post('/', tradeSimController.createTrade);
  * @param userId
  * @returns Array of user's trades
  */
+
 tradeSimRouter.get('/user/:userId', tradeSimController.getUserTrades);
 
 
@@ -24,7 +26,8 @@ tradeSimRouter.get('/user/:userId', tradeSimController.getUserTrades);
  * @route DELETE /api/trade-sim/user/:userId
  * @desc Delete user and all trades
  */
-tradeSimRouter.delete('/user/:userId', tradeSimController.deleteUser);
+
+// tradeSimRouter.delete('/user/:userId', tradeSimController.deleteUser);
 
 
 /**
@@ -32,6 +35,7 @@ tradeSimRouter.delete('/user/:userId', tradeSimController.deleteUser);
  * @desc Get all trades on the platform
  * @returns Array of all trades
  */
+
 tradeSimRouter.get('/', tradeSimController.getAllTrades);
 
 /**
@@ -39,6 +43,7 @@ tradeSimRouter.get('/', tradeSimController.getAllTrades);
  * @desc Get platform statistics
  * @returns Platform stats (total trades, win rate, volume, etc.)
  */
-tradeSimRouter.get('/stats', tradeSimController.getStats);
+
+// tradeSimRouter.get('/stats', tradeSimController.getStats);
 
 export default tradeSimRouter;

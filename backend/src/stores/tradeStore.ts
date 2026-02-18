@@ -5,7 +5,7 @@ class TradeStore {
   private trades: Map<string, Trade> = new Map();
   private userBalances: Map<string, number> = new Map();
   private adminSettings: AdminSettings = {
-    globalMode: 'random',
+    globalMode: 'RANDOM',
     winProbability: 60,
     userOverrides: new Map(),
   };
@@ -134,7 +134,7 @@ class TradeStore {
   reset(): void {
     this.trades.clear();
     this.adminSettings = {
-      globalMode: 'random',
+      globalMode: 'RANDOM',
       winProbability: 60,
       userOverrides: new Map(),
     };
@@ -145,7 +145,7 @@ class TradeStore {
     const allTrades = Array.from(this.trades.values());
     const totalTrades = allTrades.length;
     const totalWins = allTrades.filter(t => t.outcome === 'WIN').length;
-    const totalLosses = allTrades.filter(t => t.outcome === 'LOSE').length;
+    const totalLosses = allTrades.filter(t => t.outcome === 'LOSS').length;
     const totalVolumeUSD = allTrades.reduce((sum, t) => sum + t.amount, 0);
     const totalReturned = allTrades.reduce((sum, t) => sum + t.returnedAmount, 0);
     const totalProfit = totalReturned - totalVolumeUSD;

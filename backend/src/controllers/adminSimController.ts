@@ -3,6 +3,7 @@ import { tradeEngine } from '../services/tradeEngine';
 
 const ALLOWED_EXPIRATION_TIMES = [30, 60, 120, 180, 240, 300, 360];
 
+
 class AdminSimController {
   setGlobalMode = (req: Request, res: Response): void => {
     try {
@@ -15,6 +16,8 @@ class AdminSimController {
         });
         return;
       }
+
+
 
       tradeEngine.setGlobalMode(mode);
 

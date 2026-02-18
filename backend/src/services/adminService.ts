@@ -1,10 +1,13 @@
-// src/services/adminService.ts
 import bcrypt from 'bcrypt';
-
 import { prisma } from '../prismaClient';
 import { tradeStore } from '../stores/tradeStore';
 
 class AdminService {
+  // Helper function to get asset as string
+  private getAssetString(asset: string | { symbol: string }): string {
+    return typeof asset === 'string' ? asset : asset.symbol;
+  }
+
   // --- Contacts ---
   async getContacts() {
     const contacts = await prisma.adminContact.findMany();
@@ -104,7 +107,8 @@ class AdminService {
   async getMostTradedCoins() {
     const coinMap = new Map<string, number>();
     tradeStore.getAllTrades().forEach(t => {
-      coinMap.set(t.asset, (coinMap.get(t.asset) || 0) + 1);
+      const assetString = this.getAssetString(t.asset);
+      coinMap.set(assetString, (coinMap.get(assetString) || 0) + 1);
     });
 
     return Array.from(coinMap.entries())
