@@ -1,5 +1,6 @@
 import { PrismaClient, TradeOutcome as PrismaTradeOutcome } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+
 import {
   TradeRequest,
   TradeOutcome,
@@ -139,37 +140,55 @@ export class TradeEngine {
   });
 
   // Step 5: Update user balance correctly using a transaction
-  const updatedUser = await prisma.$transaction(async (tx) => {
-  const user = await tx.user.findUnique({ where: { id: tradeRequest.userId } })
-  if (!user) throw new Error('User not found')
+  // Step 5: Update correct balance (demo OR real) using transaction
+const updatedUser = await prisma.$transaction(async (tx) => {
+  const user = await tx.user.findUnique({
+    where: { id: tradeRequest.userId },
+  });
 
-  // WIN → add profit, LOSS → subtract profit
-  const netChange = outcome === 'WIN' ? profitLossAmount : -profitLossAmount
+  if (!user) throw new Error('User not found');
+
+  const netChange = outcome === 'WIN'
+    ? profitLossAmount
+    : -profitLossAmount;
+
+  // Determine which balance to update
+  const balanceField = tradeRequest.isDemo ? 'demoBalance' : 'balance';
 
   const finalUser = await tx.user.update({
     where: { id: user.id },
-    data: { demoBalance: { increment: netChange } },
-  })
+    data: {
+      [balanceField]: {
+        increment: netChange,
+      },
+    },
+  });
 
-  return finalUser
-})
+  return finalUser;
+});
+
 
 
   // Step 6: Return full trade response including new balance
   return {
-    tradeId: trade.id,
-    userId: trade.userId,
-    type: tradeRequest.type,
-    asset: assetSymbol,
-    amount: tradeRequest.amount,
-    expirationTime: tradeRequest.expirationTime,
-    outcome,
-    returnedAmount,
-    profitLossAmount,
-    profitLossPercent,
-    timestamp: trade.createdAt,
-    newBalance: updatedUser.demoBalance, // immediate updated balance for frontend
-  };
+  tradeId: trade.id,
+  userId: trade.userId,
+  type: tradeRequest.type,
+  asset: assetSymbol,
+  amount: tradeRequest.amount,
+  expirationTime: tradeRequest.expirationTime,
+  outcome,
+  returnedAmount,
+  profitLossAmount,
+  profitLossPercent,
+  timestamp: trade.createdAt,
+  newBalance: tradeRequest.isDemo
+    ? updatedUser.demoBalance
+    : updatedUser.balance,
+};
+
+
+
 }
 
 

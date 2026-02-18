@@ -26,6 +26,7 @@ export interface TradeRequest {
   asset: string | { symbol: string };
   amount: number;
   expirationTime: ExpirationTime;
+  isDemo: boolean;
 }
 
 export interface TradeResponse {
