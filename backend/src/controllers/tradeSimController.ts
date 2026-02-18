@@ -61,49 +61,52 @@ createTrade = async (req: Request, res: Response): Promise<void> => {
    * GET /api/trades/user/:userId
    */
   getUserTrades = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { userId } = req.params;
+  try {
+    let { userId } = req.params;
 
-      if (!userId) {
-        res.status(400).json({
-          success: false,
-          message: 'userId parameter is required',
-        });
-        return;
-      }
-
-      const trades = await tradeEngine.getUserTrades(userId);
-
-      res.status(200).json({
-        success: true,
-        message: 'User trades retrieved successfully',
-        data: {
-          userId,
-          totalTrades: trades.length,
-          trades: trades.map((t: any) => ({
-            tradeId: t.id,
-            type: t.type,
-            asset: t.cryptoSymbol,
-            amount: t.amountUSD,
-            expirationTime: t.expirationTime,
-            outcome: t.outcome,
-            returnedAmount:
-              (t.amountUSD || 0) + (t.profitLoss || 0),
-            profitLossAmount: t.profitLoss,
-            profitLossPercent: t.profitLossPercent,
-            timestamp: t.createdAt,
-            completedAt: t.executedAt,
-          })),
-        },
-      });
-    } catch (error) {
-      res.status(500).json({
+    if (!userId) {
+      res.status(400).json({
         success: false,
-        message: 'Error retrieving user trades',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        message: 'userId parameter is required',
       });
+      return;
     }
-  };
+
+    // Trim any whitespace/newlines from the userId
+    userId = userId.trim();
+
+    const trades = await tradeEngine.getUserTrades(userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'User trades retrieved successfully',
+      data: {
+        userId,
+        totalTrades: trades.length,
+        trades: trades.map((t: any) => ({
+          tradeId: t.id,
+          type: t.type,
+          asset: t.cryptoSymbol,
+          amount: t.amountUSD,
+          expirationTime: t.expirationTime,
+          outcome: t.outcome,
+          returnedAmount: (t.amountUSD || 0) + (t.profitLoss || 0),
+          profitLossAmount: t.profitLoss,
+          profitLossPercent: t.profitLossPercent,
+          timestamp: t.createdAt,
+          completedAt: t.executedAt,
+        })),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving user trades',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
 
   /**
    * DELETE /api/trade-sim/user/:userId
@@ -184,23 +187,23 @@ createTrade = async (req: Request, res: Response): Promise<void> => {
   /**
    * GET /api/trades/stats
    */
-  // getStats = async (_req: Request, res: Response): Promise<void> => {
-  //   try {
-  //     const stats = await tradeEngine.getStats();
+  getStats = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const stats = await tradeEngine.getStats();
 
-  //     res.status(200).json({
-  //       success: true,
-  //       message: 'Platform statistics retrieved successfully',
-  //       data: stats,
-  //     });
-  //   } catch (error) {
-  //     res.status(500).json({
-  //       success: false,
-  //       message: 'Error retrieving statistics',
-  //       error: error instanceof Error ? error.message : 'Unknown error',
-  //     });
-  //   }
-  // };
+      res.status(200).json({
+        success: true,
+        message: 'Platform statistics retrieved successfully',
+        data: stats,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving statistics',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
 }
 
 export const tradeSimController = new TradeSimController();
