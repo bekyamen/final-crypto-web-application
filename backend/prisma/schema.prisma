@@ -284,6 +284,8 @@ model Trade {
   executedAt    DateTime?
   expirationTime Int?
 
+  isDemo           Boolean       @default(false)
+
   status            TradeStatus   @default(SCHEDULED)
   outcome           TradeOutcome?
   profitLoss        Float?
