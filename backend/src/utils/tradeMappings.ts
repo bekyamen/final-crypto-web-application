@@ -7,9 +7,9 @@ import { TradeType, TradeOutcome } from '../types/trade.types';
  */
 export function toPrismaTradeType(type: TradeType): PrismaTradeType {
   switch (type) {
-    case 'buy':
+    case 'BUY':
       return PrismaTradeType.BUY;
-    case 'sell':
+    case 'SELL':
       return PrismaTradeType.SELL;
     default:
       throw new Error(`Invalid trade type: ${type}`);
@@ -22,9 +22,9 @@ export function toPrismaTradeType(type: TradeType): PrismaTradeType {
 export function fromPrismaTradeType(type: PrismaTradeType): TradeType {
   switch (type) {
     case PrismaTradeType.BUY:
-      return 'buy';
+      return 'BUY';
     case PrismaTradeType.SELL:
-      return 'sell';
+      return 'BUY';
     default:
       throw new Error(`Invalid Prisma trade type: ${type}`);
   }
