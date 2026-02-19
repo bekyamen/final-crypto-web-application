@@ -1,4 +1,4 @@
-import { PrismaClient, TradeOutcome as PrismaTradeOutcome } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
@@ -6,7 +6,6 @@ import {
   TradeOutcome,
   AdminMode,
   ExpirationTime,
-  TradeResponse,
   AdminSettings,
   BetConfig,
 } from '../types/trade.types';
