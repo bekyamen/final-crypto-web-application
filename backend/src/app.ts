@@ -1,7 +1,8 @@
 import express, { Express, Request, Response } from 'express';
-
+import cron from 'node-cron';
 import cors from 'cors';
 import path from "path"
+import { tradeEngine } from './services/tradeEngine';
 import { errorHandler } from './middlewares/errorMiddleware';
 import authRouter from './routes/authRoutes';
 import portfolioRouter from './routes/portfolioRoutes';
@@ -156,6 +157,15 @@ app.use((req: Request, res: Response) => {
     errorCode: 'NOT_FOUND',
     path: req.path,
   });
+});
+
+
+cron.schedule('* * * * * *', async () => {
+  try {
+    await tradeEngine.executeExpiredTrades();
+  } catch (error) {
+    console.error('Error executing scheduled trades:', error);
+  }
 });
 
 // Error handling middleware (must be last)

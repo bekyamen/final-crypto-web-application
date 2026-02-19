@@ -44,7 +44,7 @@ if (!validExpirationTimes.includes(tradeRequest.expirationTime)) {
     }
 
     // Execute trade
-    const trade = await tradeEngine.executeTrade(tradeRequest);
+    const trade = await tradeEngine.executeExpiredTrades();
 
     res.status(200).json({
       success: true,

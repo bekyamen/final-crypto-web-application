@@ -112,24 +112,30 @@ export class TradeEngine {
 
 
 
- async executeTrade(tradeRequest: TradeRequest): Promise<TradeResponse> {
-  // Step 1: Determine the trade outcome (WIN or LOSS) based on admin settings and randomization
-  const outcome = await this.calculateOutcome(tradeRequest.userId);
+ async scheduleTrade(tradeRequest: TradeRequest) {
+  const assetSymbol =
+    typeof tradeRequest.asset === 'string'
+      ? tradeRequest.asset
+      : tradeRequest.asset.symbol;
 
-  // Step 2: Calculate profit/loss based on expiration time and trade amount
-  const { returnedAmount, profitLossAmount, profitLossPercent } = this.calculateReturnedAmount(
-    tradeRequest.amount,
-    tradeRequest.expirationTime,
-    outcome
+  const scheduledTime = new Date(
+    Date.now() + tradeRequest.expirationTime * 1000
   );
 
-  // Step 3: Normalize asset symbol
-  const getAssetSymbol = (asset: string | { symbol: string }): string => {
-    return typeof asset === 'string' ? asset : asset.symbol;
-  };
-  const assetSymbol = getAssetSymbol(tradeRequest.asset);
+  const balanceField = tradeRequest.isDemo
+    ? 'demoBalance'
+    : 'balance';
 
-  // Step 4: Record trade in database
+  // Deduct stake immediately
+  await prisma.user.update({
+    where: { id: tradeRequest.userId },
+    data: {
+      [balanceField]: {
+        decrement: tradeRequest.amount,
+      },
+    },
+  });
+
   const trade = await prisma.trade.create({
     data: {
       id: uuidv4(),
@@ -137,66 +143,71 @@ export class TradeEngine {
       type: tradeRequest.type.toUpperCase() as 'BUY' | 'SELL',
       cryptoSymbol: assetSymbol,
       amountUSD: tradeRequest.amount,
-      scheduledTime: new Date(Date.now() + tradeRequest.expirationTime * 1000),
-      executedAt: new Date(),
-      outcome: outcome as PrismaTradeOutcome,
-      profitLoss: profitLossAmount,
-      profitLossPercent,
-      notes: `Asset: ${assetSymbol}`,
+      expirationTime: tradeRequest.expirationTime,
+      scheduledTime,
+      status: 'SCHEDULED',
     },
   });
 
-  // Step 5: Update user balance correctly using a transaction
-  // Step 5: Update correct balance (demo OR real) using transaction
-const updatedUser = await prisma.$transaction(async (tx) => {
-  const user = await tx.user.findUnique({
-    where: { id: tradeRequest.userId },
-  });
-
-  if (!user) throw new Error('User not found');
-
-  const netChange = outcome === 'WIN'
-    ? profitLossAmount
-    : -profitLossAmount;
-
-  // Determine which balance to update
-  const balanceField = tradeRequest.isDemo ? 'demoBalance' : 'balance';
-
-  const finalUser = await tx.user.update({
-    where: { id: user.id },
-    data: {
-      [balanceField]: {
-        increment: netChange,
-      },
-    },
-  });
-
-  return finalUser;
-});
-
-
-
-  // Step 6: Return full trade response including new balance
-  return {
-  tradeId: trade.id,
-  userId: trade.userId,
-  type: tradeRequest.type,
-  asset: assetSymbol,
-  amount: tradeRequest.amount,
-  expirationTime: tradeRequest.expirationTime,
-  outcome,
-  returnedAmount,
-  profitLossAmount,
-  profitLossPercent,
-  timestamp: trade.createdAt,
-  newBalance: tradeRequest.isDemo
-    ? updatedUser.demoBalance
-    : updatedUser.balance,
-};
-
-
-
+  return trade;
 }
+
+async executeExpiredTrades() {
+  const expiredTrades = await prisma.trade.findMany({
+    where: {
+      status: 'SCHEDULED',
+      scheduledTime: { lte: new Date() },
+    },
+  });
+
+  for (const trade of expiredTrades) {
+  if (trade.expirationTime == null) {
+    console.error(`Trade ${trade.id} has null expirationTime`);
+    continue;
+  }
+
+  const outcome = await this.calculateOutcome(trade.userId);
+
+  const { profitLossAmount, profitLossPercent } =
+    this.calculateReturnedAmount(
+      trade.amountUSD,
+      trade.expirationTime, // now guaranteed number
+      outcome
+    );
+
+
+    const balanceField = trade.isDemo
+      ? 'demoBalance'
+      : 'balance';
+
+    await prisma.$transaction(async (tx) => {
+      if (outcome === 'WIN') {
+        await tx.user.update({
+          where: { id: trade.userId },
+          data: {
+            [balanceField]: {
+              increment: trade.amountUSD + profitLossAmount,
+            },
+          },
+        });
+      }
+
+      await tx.trade.update({
+        where: { id: trade.id },
+        data: {
+          outcome,
+          profitLoss: profitLossAmount,
+          profitLossPercent,
+          executedAt: new Date(),
+          status: 'EXECUTED',
+        },
+      });
+    });
+  }
+}
+
+
+
 
 
   /** ====================== USER TRADES ====================== */
