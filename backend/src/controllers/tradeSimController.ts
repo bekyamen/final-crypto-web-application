@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { tradeEngine } from '../services/tradeEngine';
-import { TradeRequest } from '../types/trade.types';
+import { TradeRequest,ExpirationTime } from '../types/trade.types';
 
 class TradeSimController {
   /**
@@ -26,13 +26,17 @@ createTrade = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (![30, 60, 120, 300].includes(tradeRequest.expirationTime)) {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid expiration time. Must be 30, 60, 120, or 300 seconds',
-      });
-      return;
-    }
+    // Accept all valid expiration times from TradeEngine
+const validExpirationTimes: ExpirationTime[] = [30, 60, 90, 120, 180, 360];
+
+if (!validExpirationTimes.includes(tradeRequest.expirationTime)) {
+  res.status(400).json({
+    success: false,
+    message: `Invalid expiration time. Must be one of: ${validExpirationTimes.join(', ')} seconds`,
+  });
+  return;
+}
+
 
     if (tradeRequest.amount <= 0) {
       res.status(400).json({ success: false, message: 'Trade amount must be greater than 0' });

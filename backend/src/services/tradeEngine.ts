@@ -91,16 +91,23 @@ export class TradeEngine {
 
  
   calculateReturnedAmount(amount: number, expirationTime: number, outcome: TradeOutcome) {
-  const percent = this.PERCENTAGE_MAP[expirationTime]
-  if (percent === undefined) throw new Error('Invalid expiration time')
+  const percent = this.PERCENTAGE_MAP[expirationTime];
+  if (percent === undefined) throw new Error('Invalid expiration time');
 
-  const profitLossAmount = amount * percent
+  // Calculate profit/loss precisely
+  let profitLossAmount = amount * percent;
+
+  // Round to 2 decimals to avoid floating point errors
+  profitLossAmount = Math.round(profitLossAmount * 100) / 100;
+
+  const returnedAmount = profitLossAmount; // only profit/loss, not principal
+  const profitLossPercent = outcome === 'WIN' ? percent * 100 : -percent * 100;
 
   return {
-    returnedAmount: profitLossAmount, // only profit/loss, not principal
+    returnedAmount,
     profitLossAmount,
-    profitLossPercent: outcome === 'WIN' ? percent * 100 : -percent * 100,
-  }
+    profitLossPercent,
+  };
 }
 
 

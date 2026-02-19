@@ -1,9 +1,9 @@
-export type TradeType = 'buy' | 'sell';
+export type TradeType = 'BUY' | 'SELL';
 export type TradeOutcome = 'WIN' | 'LOSS' | 'NEUTRAL';
 
 export type AdminMode = 'WIN' | 'LOSS' | 'RANDOM';
 
-export type ExpirationTime = 30 | 60 | 120 | 300; // seconds
+export type ExpirationTime = 30 | 60 | 90 | 120 | 180 | 360 ; // seconds
 
 export interface Trade {
   id: string;
