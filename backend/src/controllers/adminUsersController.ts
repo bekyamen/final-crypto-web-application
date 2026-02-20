@@ -7,7 +7,7 @@ class AdminUsersController {
    * GET /api/admin/users-with-mode
    * Returns all users with their active override mode or global mode if none
    */
-  getUsersWithMode = async (req: Request, res: Response) => {
+  getUsersWithMode = async (_req: Request, res: Response) => {
     try {
       // Fetch all users with their UserOverride relation
       const users = await prisma.user.findMany({

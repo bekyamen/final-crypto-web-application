@@ -69,7 +69,7 @@ class AdminSimController {
 
   /** ==================== NEW: GET USERS WITH MODE ==================== */
   /** ==================== NEW: GET USERS WITH MODE ==================== */
-getUsersWithMode = async (req: Request, res: Response) => {
+getUsersWithMode = async (_req: Request, res: Response) => {
   try {
     // Fetch all users with their UserOverride relation
     const users = await prisma.user.findMany({
