@@ -1,3 +1,4 @@
+
 import { Request, Response } from 'express';
 import { tradeEngine } from '../services/tradeEngine';
 import { TradeRequest,ExpirationTime } from '../types/trade.types';
@@ -44,8 +45,7 @@ if (!validExpirationTimes.includes(tradeRequest.expirationTime)) {
     }
 
     // Execute trade
-    const trade = await tradeEngine.scheduleTrade(tradeRequest);
-
+    const trade = await tradeEngine.executeTrade(tradeRequest);
 
     res.status(200).json({
       success: true,
@@ -212,3 +212,4 @@ if (!validExpirationTimes.includes(tradeRequest.expirationTime)) {
 }
 
 export const tradeSimController = new TradeSimController();
+
