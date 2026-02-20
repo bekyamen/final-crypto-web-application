@@ -1,15 +1,7 @@
-  import { PrismaClient, TradeOutcome as PrismaTradeOutcome } from '@prisma/client';
+// src/services/tradeEngine.ts
+import { PrismaClient, TradeOutcome } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
-
-import {
-  TradeRequest,
-  TradeOutcome,
-  AdminMode,
-  ExpirationTime,
-  TradeResponse,
-  AdminSettings,
-  BetConfig,
-} from '../types/trade.types';
+import { TradeRequest } from '../types/trade.types';
 
 const prisma = new PrismaClient();
 
@@ -23,16 +15,15 @@ export class TradeEngine {
     360: 0.27,
   };
 
-  private adminSettings: AdminSettings = {
-    globalMode: 'RANDOM',
+  private adminSettings = {
+    globalMode: 'RANDOM' as 'WIN' | 'LOSS' | 'RANDOM',
     winProbability: 60,
-    userOverrides: new Map<string, { userId: string; forceOutcome: 'win' | 'lose' | null; expiresAt?: Date }>(),
   };
 
-  private betConfig: BetConfig = {};
+  private betConfig: Record<number, { profitPercent: number; lossPercent: number }> = {};
 
   /** ====================== ADMIN METHODS ====================== */
-  setGlobalMode(mode: AdminMode) {
+  setGlobalMode(mode: 'WIN' | 'LOSS' | 'RANDOM') {
     this.adminSettings.globalMode = mode;
   }
 
@@ -40,44 +31,60 @@ export class TradeEngine {
     this.adminSettings.winProbability = percentage;
   }
 
-  setUserOverride(userId: string, forceOutcome: 'win' | 'lose' | null, expiresAt?: Date) {
-    this.adminSettings.userOverrides.set(userId, { userId, forceOutcome, expiresAt });
+  async setUserOverride(userId: string, forceOutcome: 'win' | 'lose' | null, expiresAt?: Date) {
+    if (forceOutcome === null) {
+      // remove override
+      await prisma.userOverride.deleteMany({ where: { userId } });
+    } else {
+      await prisma.userOverride.upsert({
+        where: { userId },
+        update: { forceOutcome: forceOutcome.toUpperCase(), expiresAt: expiresAt ?? null },
+        create: { userId, forceOutcome: forceOutcome.toUpperCase(), expiresAt: expiresAt ?? null },
+      });
+    }
   }
 
-  updateBetConfig(expirationTime: ExpirationTime, profitPercent: number, lossPercent: number) {
+  async getUserOverride(userId: string) {
+    const override = await prisma.userOverride.findUnique({ where: { userId } });
+    if (!override) return null;
+
+    if (override.expiresAt && override.expiresAt < new Date()) {
+      await prisma.userOverride.delete({ where: { userId } });
+      return null;
+    }
+
+    return override;
+  }
+
+  updateBetConfig(expirationTime: number, profitPercent: number, lossPercent: number) {
     this.betConfig[expirationTime] = { profitPercent, lossPercent };
   }
 
-  getAdminSettings(): AdminSettings {
-    return this.adminSettings;
+  getAdminSettings() {
+    return {
+      globalMode: this.adminSettings.globalMode,
+      winProbability: this.adminSettings.winProbability,
+    };
   }
 
   getStats() {
     return {
-      totalTrades: 0, // Implement if needed
-      totalVolume: 0, // Implement if needed
+      totalTrades: 0, // optional: implement if needed
+      totalVolume: 0,
     };
   }
 
   reset() {
-    this.adminSettings = {
-      globalMode: 'RANDOM',
-      winProbability: 60,
-      userOverrides: new Map(),
-    };
+    this.adminSettings.globalMode = 'RANDOM';
+    this.adminSettings.winProbability = 60;
     this.betConfig = {};
   }
 
   /** ====================== TRADE LOGIC ====================== */
   async calculateOutcome(userId: string): Promise<TradeOutcome> {
-    const override = this.adminSettings.userOverrides.get(userId);
+    const override = await this.getUserOverride(userId);
     if (override?.forceOutcome) {
-      if (override.expiresAt && new Date() > override.expiresAt) {
-        this.adminSettings.userOverrides.delete(userId);
-      } else {
-        // return 'WIN' or 'LOSS' because TradeOutcome is uppercase
-        return override.forceOutcome === 'win' ? 'WIN' : 'LOSS';
-      }
+      return override.forceOutcome === 'WIN' ? 'WIN' : 'LOSS';
     }
 
     if (this.adminSettings.globalMode === 'RANDOM') {
@@ -85,119 +92,89 @@ export class TradeEngine {
       return randomValue <= this.adminSettings.winProbability ? 'WIN' : 'LOSS';
     }
 
-    // Map adminMode to TradeOutcome
     return this.adminSettings.globalMode === 'WIN' ? 'WIN' : 'LOSS';
   }
 
- 
   calculateReturnedAmount(amount: number, expirationTime: number, outcome: TradeOutcome) {
-  const percent = this.PERCENTAGE_MAP[expirationTime];
-  if (percent === undefined) throw new Error('Invalid expiration time');
+    const percent = this.PERCENTAGE_MAP[expirationTime];
+    if (percent === undefined) throw new Error('Invalid expiration time');
 
-  // Calculate profit/loss precisely
-  let profitLossAmount = amount * percent;
+    let profitLossAmount = amount * percent;
+    profitLossAmount = Math.round(profitLossAmount * 100) / 100;
 
-  // Round to 2 decimals to avoid floating point errors
-  profitLossAmount = Math.round(profitLossAmount * 100) / 100;
+    const profitLossPercent = outcome === 'WIN' ? percent * 100 : -percent * 100;
+    return { returnedAmount: profitLossAmount, profitLossAmount, profitLossPercent };
+  }
 
-  const returnedAmount = profitLossAmount; // only profit/loss, not principal
-  const profitLossPercent = outcome === 'WIN' ? percent * 100 : -percent * 100;
+  async scheduleTrade(tradeRequest: TradeRequest) {
+    const assetSymbol =
+      typeof tradeRequest.asset === 'string'
+        ? tradeRequest.asset
+        : tradeRequest.asset.symbol;
 
-  return {
-    returnedAmount,
-    profitLossAmount,
-    profitLossPercent,
-  };
-}
+    const scheduledTime = new Date(Date.now() + tradeRequest.expirationTime * 1000);
+    const balanceField = tradeRequest.isDemo ? 'demoBalance' : 'balance';
 
+    await prisma.user.update({
+      where: { id: tradeRequest.userId },
+      data: { [balanceField]: { decrement: tradeRequest.amount } },
+    });
 
-
- async executeTrade(tradeRequest: TradeRequest): Promise<TradeResponse> {
-  // Step 1: Determine the trade outcome (WIN or LOSS) based on admin settings and randomization
-  const outcome = await this.calculateOutcome(tradeRequest.userId);
-
-  // Step 2: Calculate profit/loss based on expiration time and trade amount
-  const { returnedAmount, profitLossAmount, profitLossPercent } = this.calculateReturnedAmount(
-    tradeRequest.amount,
-    tradeRequest.expirationTime,
-    outcome
-  );
-
-  // Step 3: Normalize asset symbol
-  const getAssetSymbol = (asset: string | { symbol: string }): string => {
-    return typeof asset === 'string' ? asset : asset.symbol;
-  };
-  const assetSymbol = getAssetSymbol(tradeRequest.asset);
-
-  // Step 4: Record trade in database
-  const trade = await prisma.trade.create({
-    data: {
-      id: uuidv4(),
-      userId: tradeRequest.userId,
-      type: tradeRequest.type.toUpperCase() as 'BUY' | 'SELL',
-      cryptoSymbol: assetSymbol,
-      amountUSD: tradeRequest.amount,
-      scheduledTime: new Date(Date.now() + tradeRequest.expirationTime * 1000),
-      executedAt: new Date(),
-      outcome: outcome as PrismaTradeOutcome,
-      profitLoss: profitLossAmount,
-      profitLossPercent,
-      notes: `Asset: ${assetSymbol}`,
-    },
-  });
-
-  // Step 5: Update user balance correctly using a transaction
-  // Step 5: Update correct balance (demo OR real) using transaction
-const updatedUser = await prisma.$transaction(async (tx) => {
-  const user = await tx.user.findUnique({
-    where: { id: tradeRequest.userId },
-  });
-
-  if (!user) throw new Error('User not found');
-
-  const netChange = outcome === 'WIN'
-    ? profitLossAmount
-    : -profitLossAmount;
-
-  // Determine which balance to update
-  const balanceField = tradeRequest.isDemo ? 'demoBalance' : 'balance';
-
-  const finalUser = await tx.user.update({
-    where: { id: user.id },
-    data: {
-      [balanceField]: {
-        increment: netChange,
+    const trade = await prisma.trade.create({
+      data: {
+        id: uuidv4(),
+        userId: tradeRequest.userId,
+        type: tradeRequest.type.toUpperCase() as 'BUY' | 'SELL',
+        cryptoSymbol: assetSymbol,
+        amountUSD: tradeRequest.amount,
+        expirationTime: tradeRequest.expirationTime,
+        scheduledTime,
+        status: 'SCHEDULED',
+        isDemo: tradeRequest.isDemo,
       },
-    },
-  });
+    });
 
-  return finalUser;
-});
+    return trade;
+  }
 
+  async executeExpiredTrades() {
+    const expiredTrades = await prisma.trade.findMany({
+      where: { status: 'SCHEDULED', scheduledTime: { lte: new Date() } },
+    });
 
+    for (const trade of expiredTrades) {
+      if (!trade.expirationTime) continue;
 
-  // Step 6: Return full trade response including new balance
-  return {
-  tradeId: trade.id,
-  userId: trade.userId,
-  type: tradeRequest.type,
-  asset: assetSymbol,
-  amount: tradeRequest.amount,
-  expirationTime: tradeRequest.expirationTime,
-  outcome,
-  returnedAmount,
-  profitLossAmount,
-  profitLossPercent,
-  timestamp: trade.createdAt,
-  newBalance: tradeRequest.isDemo
-    ? updatedUser.demoBalance
-    : updatedUser.balance,
-};
+      const outcome = await this.calculateOutcome(trade.userId);
+      const { profitLossAmount, profitLossPercent } = this.calculateReturnedAmount(
+        trade.amountUSD,
+        trade.expirationTime,
+        outcome
+      );
 
+      const balanceField = trade.isDemo ? 'demoBalance' : 'balance';
 
+      await prisma.$transaction(async (tx) => {
+        if (outcome === 'WIN') {
+          await tx.user.update({
+            where: { id: trade.userId },
+            data: { [balanceField]: { increment: trade.amountUSD + profitLossAmount } },
+          });
+        }
 
-}
-
+        await tx.trade.update({
+          where: { id: trade.id },
+          data: {
+            outcome,
+            profitLoss: profitLossAmount,
+            profitLossPercent,
+            executedAt: new Date(),
+            status: 'EXECUTED',
+          },
+        });
+      });
+    }
+  }
 
   /** ====================== USER TRADES ====================== */
   getUserTrades(userId: string) {
@@ -210,6 +187,3 @@ const updatedUser = await prisma.$transaction(async (tx) => {
 }
 
 export const tradeEngine = new TradeEngine();
-
-
-
