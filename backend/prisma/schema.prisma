@@ -353,7 +353,7 @@ model UserOverride {
   id           String    @id @default(cuid())
   userId       String    @unique
   forceOutcome String?
-  expiresAt    DateTime?
+ 
   user         User      @relation(fields: [userId], references: [id])
 }
 
