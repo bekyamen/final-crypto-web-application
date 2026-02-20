@@ -10,6 +10,7 @@ interface AdjustBalanceInput {
   amount: number;
   reason: string;
   adminId: string;
+   mode: 'set' | 'add' | 'deduct'; // new field
 }
 
 interface UpdateSettingsInput {
@@ -26,7 +27,7 @@ interface UpdateSettingsInput {
 
 class TradeAdminService {
  async adjustUserBalance(input: AdjustBalanceInput): Promise<any> {
-  const { userId, amount, reason, adminId } = input;
+  const { userId, amount, reason, adminId, mode } = input;
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
@@ -34,7 +35,18 @@ class TradeAdminService {
   }
 
   const previousBalance = Number(user.balance);
-  const newBalance = Number(amount); // ✅ SET directly
+  let newBalance: number;
+
+  if (mode === 'set') {
+    newBalance = Number(amount);
+  } else if (mode === 'add') {
+    newBalance = previousBalance + Number(amount);
+  } else if (mode === 'deduct') {
+    newBalance = previousBalance - Number(amount);
+    if (newBalance < 0) newBalance = 0; // prevent negative balance
+  } else {
+    throw new Error('Invalid mode. Must be set, add, or deduct.');
+  }
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -44,12 +56,13 @@ class TradeAdminService {
   // Log audit
   await this.logAuditAction({
     adminId,
-    action: 'BALANCE_SET',
+    action: 'BALANCE_ADJUSTED',
     targetUserId: userId,
     changes: {
       before: previousBalance,
       after: newBalance,
       difference: newBalance - previousBalance,
+      mode,
     },
     reason,
   });
@@ -60,6 +73,7 @@ class TradeAdminService {
     newBalance: updatedUser.balance,
     difference: newBalance - previousBalance,
     reason,
+    mode,
   };
 }
 

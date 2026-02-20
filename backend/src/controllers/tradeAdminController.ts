@@ -8,33 +8,37 @@ import { createSuccessResponse, ValidationError } from '../utils/errors';
 import { TradeOutcome } from '@prisma/client';
 
 class TradeAdminController {
-  async adjustUserBalance(req: AuthRequest, res: Response): Promise<void> {
-    const adminId = req.user?.id;
-    if (!adminId || req.user?.role !== 'ADMIN') {
-      res.status(403).json({ success: false, message: 'Forbidden' });
-      return;
-    }
-
-    const { userId, amount, reason } = req.body;
-
-    if (!userId || amount === undefined || !reason) {
-      throw new ValidationError('Missing required fields');
-
-    }
-
-
-
-    const result = await tradeAdminService.adjustUserBalance({
-      userId,
-      amount,
-      reason,
-      adminId,
-    });
-
-    res.status(200).json(
-      createSuccessResponse(result, 'User balance adjusted'),
-    );
+  
+  // src/controllers/tradeAdminController.ts
+async adjustUserBalance(req: AuthRequest, res: Response): Promise<void> {
+  const adminId = req.user?.id;
+  if (!adminId || req.user?.role !== 'ADMIN') {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
   }
+
+  const { userId, amount, reason, mode } = req.body;
+
+  if (!userId || amount === undefined || !reason) {
+    throw new ValidationError('Missing required fields');
+  }
+
+  // Validate mode
+  const validModes = ['set', 'add', 'deduct'] as const;
+  if (!validModes.includes(mode)) {
+    throw new ValidationError('Invalid mode. Must be "set", "add", or "deduct".');
+  }
+
+  const result = await tradeAdminService.adjustUserBalance({
+    userId,
+    amount,
+    reason,
+    adminId,
+    mode,
+  });
+
+  res.status(200).json(createSuccessResponse(result, 'User balance adjusted'));
+}
 
   async resetUserPassword(req: AuthRequest, res: Response): Promise<void> {
     const adminId = req.user?.id;

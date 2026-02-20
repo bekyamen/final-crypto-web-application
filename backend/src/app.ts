@@ -25,6 +25,9 @@ import addbalanceRoutes from './routes/add.balance.route';
 import userbalanceRoutes from './routes/user.balance.route';
 
 import  getAdminBalanceHistory  from './routes/adminHistoryRoutes';
+import adminUsersRouter from './routes/adminUsersRouter';
+
+
 
 const app: Express = express();
 
@@ -98,6 +101,8 @@ app.use("/api", userbalanceRoutes); // User route to get own balance
 app.use("/api/admin", getAdminBalanceHistory); // Admin route to get balance addition history
 
 app.use("/api/user", getuserReallbalance); // User route to get own real balance
+app.use('/api/admin', adminUsersRouter);
+
 
 // Documentation route
 app.get('/api', (_req: Request, res: Response) => {
