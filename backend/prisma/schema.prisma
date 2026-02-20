@@ -87,46 +87,42 @@ model WithdrawRequest {
 }
 
 // User model for authentication and authorization
-model User {
-  id            String        @id @default(cuid())
-  email         String        @unique
-  password      String
-  fundsPassword String?
-  firstName     String
-  lastName      String
-  phoneNumber   String?
-  role          UserRole      @default(USER)
-  portfolio     Portfolio?
-  transactions  Transaction[]
 
-  forcePasswordReset Boolean   @default(false)
-  passwordUpdatedAt  DateTime?
-
-  // Trading related
-  balance       Float        @default(0)
-  demoBalance   Float         @default(0) // ✅ Add this field
-  totalInvested Float        @default(0)
-  totalEarnings Float        @default(0)
-  trades        Trade[]
-  userWallets   UserWallet[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  depositRequests  DepositRequest[]
-  reviewedDeposits DepositRequest[] @relation("DepositReviewedBy")
-
-  withdrawRequests    WithdrawRequest[]
-  
+  model User {
+  id                  String            @id @default(cuid())
+  email               String            @unique
+  password            String
+  fundsPassword       String?
+  firstName           String
+  lastName            String
+  phoneNumber         String?
+  role                UserRole          @default(USER)
+  balance             Float             @default(0)
+  totalInvested       Float             @default(0)
+  totalEarnings       Float             @default(0)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  forcePasswordReset  Boolean           @default(false)
+  passwordUpdatedAt   DateTime?
+  demoBalance         Float             @default(0)
+  adminLogs           AuditLog[]        @relation("AdminLogs")
+  targetUserLogs      AuditLog[]        @relation("TargetUserLogs")
+  reviewedDeposits    DepositRequest[]  @relation("DepositReviewedBy")
+  depositRequests     DepositRequest[]
+  portfolio           Portfolio?
+  trades              Trade[]
+  transactions        Transaction[]
+  userOverride        UserOverride?
+  userWallets         UserWallet[]
   reviewedWithdrawals WithdrawRequest[] @relation("WithdrawReviewedBy")
-
-  adminLogs      AuditLog[] @relation("AdminLogs")
-  targetUserLogs AuditLog[] @relation("TargetUserLogs")
+  withdrawRequests    WithdrawRequest[]
 
   @@index([email])
   @@index([phoneNumber])
   @@index([role])
 }
+
+
 
 model AdminContact {
   id        String   @id @default(cuid())
@@ -354,11 +350,13 @@ model TradingSettings {
 }
 
 model UserOverride {
-  id           String  @id @default(cuid())
-  userId       String  @unique
-  forceOutcome String? // win or lose
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  forceOutcome String?
   expiresAt    DateTime?
+  user         User      @relation(fields: [userId], references: [id])
 }
+
 
 // Crypto price cache
 model CryptoPrice {
