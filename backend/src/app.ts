@@ -78,30 +78,45 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// API Routes
+
+// ======================
+// API Routes (ORDER FIXED)
+// ======================
+
+// Public routes
 app.use('/api/auth', authRouter);
+app.use('/api/market', marketRouter);
+app.use('/api/contacts', contactRouter);
+
+// User routes
 app.use('/api/portfolio', portfolioRouter);
 app.use('/api/transactions', transactionRouter);
-app.use('/api/admin', adminRouter);
-app.use('/api/market', marketRouter);
 app.use('/api/trades', tradeRouter);
-app.use('/api/admin/trades', adminTradeRouter);
 app.use('/api/trade-sim', tradeSimRouter);
-app.use('/api/admin', adminSimRouter);
-app.use('/api/contacts', contactRouter);
+
+app.use("/api/user", userDepositRoutes);
+app.use("/api/user/withdraw", userWithdrawRoutes);
+app.use("/api/user", getuserReallbalance);
+app.use("/api", userbalanceRoutes);
+
+// SUPER ADMIN routes
 app.use('/api/super-admin', superAdminRouter);
 
-app.use("/api/admin/deposit", adminDepositRoutes); // only SUPER_ADMIN route
-app.use("/api/user", userDepositRoutes)
-
+// 🔥 IMPORTANT: Specific admin routes FIRST
+app.use("/api/admin/deposit", adminDepositRoutes);
 app.use("/api/admin/withdraw", adminWithdrawRoutes);
-app.use("/api/user/withdraw", userWithdrawRoutes);
-app.use("/api/admin", addbalanceRoutes); // Admin route to add balance
-app.use("/api", userbalanceRoutes); // User route to get own balance
-app.use("/api/admin", getAdminBalanceHistory); // Admin route to get balance addition history
+app.use('/api/admin/trades', adminTradeRouter);
 
-app.use("/api/user", getuserReallbalance); // User route to get own real balance
+// Other admin feature routes
+app.use("/api/admin", addbalanceRoutes);
+app.use("/api/admin", getAdminBalanceHistory);
 app.use('/api/admin', adminUsersRouter);
+app.use('/api/admin', adminSimRouter);
+
+// 🔥 GENERAL admin route LAST
+app.use('/api/admin', adminRouter);
+
+
 
 
 // Documentation route
