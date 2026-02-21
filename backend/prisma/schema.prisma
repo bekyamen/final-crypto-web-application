@@ -97,6 +97,9 @@ model WithdrawRequest {
   lastName            String
   phoneNumber         String?
   role                UserRole          @default(USER)
+  
+  
+  isActive          Boolean  @default(true)
   balance             Float             @default(0)
   totalInvested       Float             @default(0)
   totalEarnings       Float             @default(0)

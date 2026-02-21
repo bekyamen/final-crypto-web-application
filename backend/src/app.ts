@@ -92,7 +92,7 @@ app.use('/api/contacts', contactRouter);
 app.use('/api/super-admin', superAdminRouter);
 
 app.use("/api/admin/deposit", adminDepositRoutes); // only SUPER_ADMIN route
-app.use("/api/user/deposit", userDepositRoutes)
+app.use("/api/user", userDepositRoutes)
 
 app.use("/api/admin/withdraw", adminWithdrawRoutes);
 app.use("/api/user/withdraw", userWithdrawRoutes);
