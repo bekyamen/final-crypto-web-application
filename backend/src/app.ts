@@ -62,10 +62,9 @@ app.use(
   }),
 );
 
-app.use(
-  '/uploads',
-  express.static(path.join(__dirname, 'uploads')) // __dirname points to src/
-)
+
+// __dirname points to dist/ in production
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 
 
