@@ -2,7 +2,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthRequest } from "../middlewares/authMiddleware"; // JWT user info
-import path from "path";
 
 const prisma = new PrismaClient();
 
