@@ -10,7 +10,7 @@ if (!fs.existsSync(qrPath)) fs.mkdirSync(qrPath, { recursive: true });
 if (!fs.existsSync(proofsPath)) fs.mkdirSync(proofsPath, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, file, cb) => {
     if (file.fieldname === "qrImage") cb(null, qrPath);
     else if (file.fieldname === "proofImage") cb(null, proofsPath);
     else cb(new Error("Invalid file field"), "");
