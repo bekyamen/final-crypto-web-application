@@ -1,11 +1,9 @@
-// controllers/userDeposit.controller.ts
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { AuthRequest } from "../middlewares/authMiddleware"; // JWT user info
+import { AuthRequest } from "../middlewares/authMiddleware";
 
 const prisma = new PrismaClient();
 
-// Extend AuthRequest to include file (for Multer)
 interface MulterRequest extends AuthRequest {
   file?: Express.Multer.File;
 }
@@ -13,53 +11,45 @@ interface MulterRequest extends AuthRequest {
 const allowedCoins = ["BTC", "ETH", "USDT"];
 
 /**
+ * Helper: Build full URL for uploaded file
+ */
+const getFullUrl = (req: Request, filePath: string | null): string => {
+  if (!filePath) return "";
+  const protocol = req.protocol || "http";
+  const host = req.get("host") || "localhost:5000";
+  return `${protocol}://${host}/${filePath.replace(/\\/g, "/")}`;
+};
+
+/**
  * ===============================
  * USER: Get Deposit Wallet Info
  * GET /api/user/deposit/wallet/:coin
  * ===============================
  */
-export const getDepositWallet = async (
-  req: Request,
-  res: Response
-) => {
+export const getDepositWallet = async (req: Request, res: Response) => {
   try {
     const { coin } = req.params;
 
-    if (!coin) {
-      return res.status(400).json({
-        success: false,
-        message: "Coin is required"
-      });
-    }
+    if (!coin) return res.status(400).json({ success: false, message: "Coin is required" });
 
-    const wallet = await prisma.depositWallet.findUnique({
-      where: { coin }
-    });
+    const wallet = await prisma.depositWallet.findUnique({ where: { coin } });
 
-    if (!wallet || !wallet.isActive) {
-      return res.status(404).json({
-        success: false,
-        message: `${coin} deposit wallet not found`
-      });
-    }
+    if (!wallet || !wallet.isActive)
+      return res.status(404).json({ success: false, message: `${coin} deposit wallet not found` });
 
-    // Build full URL for QR image
-    const qrImageUrl = `${req.protocol}://${req.get("host")}/${wallet.qrImage}`;
+    const qrImageUrl = getFullUrl(req, wallet.qrImage);
 
     return res.status(200).json({
       success: true,
       data: {
         coin: wallet.coin,
         address: wallet.address,
-        qrImage: qrImageUrl
-      }
+        qrImage: qrImageUrl,
+      },
     });
   } catch (error) {
     console.error("Get Deposit Wallet Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error"
-    });
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -69,42 +59,30 @@ export const getDepositWallet = async (
  * POST /api/user/deposit/create
  * ===============================
  */
-export const createDepositRequest = async (
-  req: MulterRequest,
-  res: Response
-) => {
+export const createDepositRequest = async (req: MulterRequest, res: Response) => {
   try {
     const { coin, amount, transactionHash } = req.body;
 
-    if (!coin || !allowedCoins.includes(coin)) {
+    if (!coin || !allowedCoins.includes(coin))
       return res.status(400).json({ success: false, message: "Invalid coin" });
-    }
 
-    if (!amount || Number(amount) <= 0) {
+    if (!amount || Number(amount) <= 0)
       return res.status(400).json({ success: false, message: "Invalid amount" });
-    }
 
-    if (!transactionHash) {
+    if (!transactionHash)
       return res.status(400).json({ success: false, message: "Transaction hash required" });
-    }
 
-    if (!req.file) {
+    if (!req.file)
       return res.status(400).json({ success: false, message: "Proof image required" });
-    }
 
-    // Check for duplicate transaction
-    const existing = await prisma.depositRequest.findFirst({
-      where: { transactionHash },
-    });
-    if (existing) {
-      return res.status(400).json({ success: false, message: "Transaction hash already submitted" });
-    }
+    // Check duplicate transaction
+    const existing = await prisma.depositRequest.findFirst({ where: { transactionHash } });
+    if (existing) return res.status(400).json({ success: false, message: "Transaction already submitted" });
 
     // Get wallet
     const wallet = await prisma.depositWallet.findUnique({ where: { coin } });
-    if (!wallet || !wallet.isActive) {
+    if (!wallet || !wallet.isActive)
       return res.status(404).json({ success: false, message: "Deposit wallet not available" });
-    }
 
     // Save deposit request
     const deposit = await prisma.depositRequest.create({
@@ -114,14 +92,19 @@ export const createDepositRequest = async (
         coin,
         amount: Number(amount),
         transactionHash,
-        proofImage: `uploads/proofs/${req.file.filename}`, // store uploaded proof image
+        proofImage: `uploads/proofs/${req.file.filename}`,
       },
     });
+
+    const proofUrl = getFullUrl(req, deposit.proofImage);
 
     return res.status(201).json({
       success: true,
       message: "Deposit request submitted",
-      data: deposit,
+      data: {
+        ...deposit,
+        proofImage: proofUrl,
+      },
     });
   } catch (error) {
     console.error("Create Deposit Request Error:", error);

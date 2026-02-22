@@ -1,17 +1,19 @@
-// routes/userDeposit.routes.ts
 import express from "express";
+import { getDepositWallet, createDepositRequest } from "../controllers/userDeposit.controller";
+import { upload } from "../middlewares/upload";
 import { authMiddleware } from "../middlewares/authMiddleware";
-import { upload } from "../middlewares/upload"; // Multer setup
-import { createDepositRequest, getDepositWallet } from "../controllers/userDeposit.controller";
 
 const router = express.Router();
 
-router.use(authMiddleware);
+// Get wallet info
+router.get("/deposit/wallet/:coin", authMiddleware, getDepositWallet);
 
-// Get deposit wallet info
-router.get("/deposit/wallet/:coin", getDepositWallet);
-
-// Create deposit request with proof image
-router.post("/deposit/create", upload.single("proofImage"), createDepositRequest);
+// Create deposit with proof image
+router.post(
+  "/deposit/create",
+  authMiddleware,
+  upload.single("proofImage"),
+  createDepositRequest
+);
 
 export default router;

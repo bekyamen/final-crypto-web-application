@@ -3,8 +3,9 @@ import { PrismaClient, DepositStatus } from "@prisma/client";
 import fs from "fs";
 import path from "path";
 import { AuthRequest } from "../middlewares/authMiddleware";
-
 const prisma = new PrismaClient();
+
+import { getQrUrl } from "../helpers/qrUrl";
 
 interface MulterRequest extends AuthRequest {
   file?: Express.Multer.File;
@@ -17,6 +18,7 @@ const allowedCoins = ["BTC", "ETH", "USDT"];
  * ADMIN: Create / Update Wallet
  * ===============================
  */
+
 export const setDepositWallet = async (req: MulterRequest, res: Response) => {
   try {
     const { coin, address } = req.body;
@@ -53,10 +55,16 @@ export const setDepositWallet = async (req: MulterRequest, res: Response) => {
       },
     });
 
+    // Return full URL for QR image
+    const walletWithUrl = {
+      ...wallet,
+      qrImage: getQrUrl(req, wallet.qrImage),
+    };
+
     return res.status(200).json({
       success: true,
       message: `${coin} wallet saved successfully`,
-      data: wallet,
+      data: walletWithUrl,
     });
   } catch (error) {
     console.error("Set Deposit Wallet Error:", error);
@@ -116,10 +124,16 @@ export const editDepositWallet = async (req: MulterRequest, res: Response) => {
       },
     });
 
+    // Return full URL for QR image
+    const walletWithUrl = {
+      ...updatedWallet,
+      qrImage: getQrUrl(req, updatedWallet.qrImage),
+    };
+
     return res.status(200).json({
       success: true,
       message: `${coin} wallet updated successfully`,
-      data: updatedWallet,
+      data: walletWithUrl,
     });
   } catch (error) {
     console.error("Edit Deposit Wallet Error:", error);
@@ -132,6 +146,7 @@ export const editDepositWallet = async (req: MulterRequest, res: Response) => {
  * ADMIN: Get Deposit by ID
  * ===============================
  */
+
 export const getDepositById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -142,12 +157,18 @@ export const getDepositById = async (req: AuthRequest, res: Response) => {
 
     if (!deposit) return res.status(404).json({ success: false, message: "Deposit not found" });
 
+    // Convert wallet QR to full URL
+    if (deposit.wallet?.qrImage) {
+      deposit.wallet.qrImage = getQrUrl(req, deposit.wallet.qrImage);
+    }
+
     return res.status(200).json({ success: true, data: deposit });
   } catch (error) {
     console.error("Get Deposit By ID Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
 
 /**
  * ===============================
@@ -158,7 +179,6 @@ export const getDepositHistory = async (req: AuthRequest, res: Response) => {
   try {
     const { userId, coin, status } = req.query;
     const where: any = {};
-
     if (userId) where.userId = String(userId);
     if (coin) where.coin = String(coin);
     if (status && Object.values(DepositStatus).includes(String(status) as DepositStatus)) {
@@ -171,7 +191,14 @@ export const getDepositHistory = async (req: AuthRequest, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    return res.status(200).json({ success: true, data: deposits });
+    const depositsWithQr = deposits.map(d => ({
+      ...d,
+      wallet: d.wallet
+        ? { ...d.wallet, qrImage: getQrUrl(req, d.wallet.qrImage) }
+        : null,
+    }));
+
+    return res.status(200).json({ success: true, data: depositsWithQr });
   } catch (error) {
     console.error("Get Deposit History Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
@@ -183,15 +210,22 @@ export const getDepositHistory = async (req: AuthRequest, res: Response) => {
  * ADMIN: Get Pending Deposits
  * ===============================
  */
-export const getPendingDeposits = async (_req: AuthRequest, res: Response) => {
+export const getPendingDeposits = async (req: AuthRequest, res: Response) => {
   try {
     const deposits = await prisma.depositRequest.findMany({
       where: { status: DepositStatus.PENDING },
-      include: { user: true },
+      include: { user: true, wallet: true },
       orderBy: { createdAt: "desc" },
     });
 
-    return res.status(200).json({ success: true, data: deposits });
+    const depositsWithQr = deposits.map(d => ({
+      ...d,
+      wallet: d.wallet
+        ? { ...d.wallet, qrImage: getQrUrl(req, d.wallet.qrImage) }
+        : null,
+    }));
+
+    return res.status(200).json({ success: true, data: depositsWithQr });
   } catch (error) {
     console.error("Get Pending Deposits Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
