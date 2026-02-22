@@ -4,8 +4,8 @@ import fs from "fs";
 import path from "path";
 import { AuthRequest } from "../middlewares/authMiddleware";
 const prisma = new PrismaClient();
-
 import { getQrUrl } from "../helpers/qrUrl";
+import { getFileUrl } from "../helpers/fileUrl";
 
 interface MulterRequest extends AuthRequest {
   file?: Express.Multer.File;
@@ -13,11 +13,27 @@ interface MulterRequest extends AuthRequest {
 
 const allowedCoins = ["BTC", "ETH", "USDT"];
 
+
 /**
  * ===============================
  * ADMIN: Create / Update Wallet
  * ===============================
  */
+
+/**
+ * Helper: Format deposit to include full URLs for wallet QR and proof image
+ */
+const formatDeposit = (req: AuthRequest, deposit: any) => ({
+  ...deposit,
+  proofImage: deposit.proofImage ? getFileUrl(req, deposit.proofImage) : null,
+  wallet: deposit.wallet
+    ? {
+        ...deposit.wallet,
+        qrImage: deposit.wallet.qrImage ? getFileUrl(req, deposit.wallet.qrImage) : null,
+      }
+    : null,
+});
+
 
 export const setDepositWallet = async (req: MulterRequest, res: Response) => {
   try {
@@ -150,6 +166,7 @@ export const editDepositWallet = async (req: MulterRequest, res: Response) => {
 export const getDepositById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+
     const deposit = await prisma.depositRequest.findUnique({
       where: { id },
       include: { user: true, wallet: true },
@@ -157,24 +174,21 @@ export const getDepositById = async (req: AuthRequest, res: Response) => {
 
     if (!deposit) return res.status(404).json({ success: false, message: "Deposit not found" });
 
-    // Convert wallet QR to full URL
-    if (deposit.wallet?.qrImage) {
-      deposit.wallet.qrImage = getQrUrl(req, deposit.wallet.qrImage);
-    }
+    const formatted = formatDeposit(req, deposit);
 
-    return res.status(200).json({ success: true, data: deposit });
+    return res.status(200).json({ success: true, data: formatted });
   } catch (error) {
     console.error("Get Deposit By ID Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-
 /**
  * ===============================
  * ADMIN: Get Deposit History
  * ===============================
  */
+
 export const getDepositHistory = async (req: AuthRequest, res: Response) => {
   try {
     const { userId, coin, status } = req.query;
@@ -191,20 +205,20 @@ export const getDepositHistory = async (req: AuthRequest, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    const depositsWithQr = deposits.map(d => ({
-      ...d,
-      wallet: d.wallet
-        ? { ...d.wallet, qrImage: getQrUrl(req, d.wallet.qrImage) }
-        : null,
-    }));
+    const formatted = deposits.map(d => formatDeposit(req, d));
 
-    return res.status(200).json({ success: true, data: depositsWithQr });
+    return res.status(200).json({ success: true, data: formatted });
   } catch (error) {
     console.error("Get Deposit History Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
+/**
+ * ===============================
+ * ADMIN: Get Pending Deposits
+ * ===============================
+ */
 /**
  * ===============================
  * ADMIN: Get Pending Deposits
@@ -218,20 +232,14 @@ export const getPendingDeposits = async (req: AuthRequest, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    const depositsWithQr = deposits.map(d => ({
-      ...d,
-      wallet: d.wallet
-        ? { ...d.wallet, qrImage: getQrUrl(req, d.wallet.qrImage) }
-        : null,
-    }));
+    const formatted = deposits.map(d => formatDeposit(req, d));
 
-    return res.status(200).json({ success: true, data: depositsWithQr });
+    return res.status(200).json({ success: true, data: formatted });
   } catch (error) {
     console.error("Get Pending Deposits Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-
 /**
  * ===============================
  * ADMIN: Approve Deposit
