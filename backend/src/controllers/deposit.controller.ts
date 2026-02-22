@@ -29,7 +29,7 @@ const formatDeposit = (req: AuthRequest, deposit: any) => ({
   wallet: deposit.wallet
     ? {
         ...deposit.wallet,
-        qrImage: deposit.wallet.qrImage ? getFileUrl(req, deposit.wallet.qrImage) : null,
+        qrImage: deposit.wallet.qrImage ? getQrUrl(req, deposit.wallet.qrImage) : null,
       }
     : null,
 });
@@ -93,13 +93,26 @@ export const setDepositWallet = async (req: MulterRequest, res: Response) => {
  * ADMIN: Get All Deposit Wallets
  * ===============================
  */
-export const getAllDepositWallets = async (_req: AuthRequest, res: Response) => {
+
+export const getAllDepositWallets = async (req: AuthRequest, res: Response) => {
   try {
     const wallets = await prisma.depositWallet.findMany({ orderBy: { createdAt: "desc" } });
+
+    // Return full URL for QR images
+    const walletsWithUrl = wallets.map(w => ({
+      ...w,
+      qrImage: w.qrImage ? getQrUrl(req, w.qrImage) : null,
+    }));
+
+    // Disable caching to avoid 304
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+
     return res.status(200).json({
       success: true,
-      count: wallets.length,
-      data: wallets,
+      count: walletsWithUrl.length,
+      data: walletsWithUrl,
     });
   } catch (error) {
     console.error("Get All Wallets Error:", error);

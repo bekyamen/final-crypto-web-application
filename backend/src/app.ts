@@ -63,8 +63,8 @@ app.use(
 );
 
 
-// __dirname points to dist/ in production
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve uploads folder
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 
 
