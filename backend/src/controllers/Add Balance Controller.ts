@@ -5,9 +5,10 @@ import { AuthRequest } from "../middlewares/authMiddleware";
 const prisma = new PrismaClient();
 
 /**
- * ===============================
- * ADMIN: Set or Add Demo Balance for All Users
- * ===============================
+ * @desc  Admin adds or sets demo balance for all users, returning history for dashboard
+ * @route POST /users/demo-balance/all
+ * @body { amount: number, reason?: string, mode: "add" | "set" }
+ * @access Admin / Super Admin
  */
 export const setDemoBalanceForAllUsers = async (
   req: AuthRequest,
@@ -22,51 +23,62 @@ export const setDemoBalanceForAllUsers = async (
     const adminId = req.user.id;
     const adminRole = req.user.role;
 
-    // 🔒 Only ADMIN or SUPER_ADMIN allowed
     if (!(adminRole === UserRole.ADMIN || adminRole === UserRole.SUPER_ADMIN)) {
       res.status(403).json({ success: false, message: "Unauthorized" });
       return;
     }
 
-    const { amount, reason, mode } = req.body; // mode: "set" | "add"
+    const { amount, reason, mode } = req.body;
 
-    // ✅ Validate amount
     if (amount === undefined || Number(amount) < 0) {
       res.status(400).json({ success: false, message: "Invalid amount" });
       return;
     }
 
-    // Validate mode
     if (mode !== "set" && mode !== "add") {
-      res.status(400).json({ success: false, message: "Invalid mode, must be 'set' or 'add'" });
+      res.status(400).json({ success: false, message: "Invalid mode" });
       return;
     }
 
-    // ✅ Fetch all users
     const users = await prisma.user.findMany();
-
     if (!users.length) {
       res.status(404).json({ success: false, message: "No users found" });
       return;
     }
 
-    // 🔹 Transaction-safe update
+    // Store history for frontend
+    const history: Array<{
+      targetUserId: string;
+      email: string;
+      previousBalance: number;
+      newBalance: number;
+      amountAdded: number;
+      reason?: string;
+      action: "add" | "set";
+    }> = [];
+
+    // Transaction-safe update for all users
     await prisma.$transaction(async (tx) => {
       for (const user of users) {
+        const oldBalance = user.demoBalance ?? 0;
         let newBalance: number;
+        let addedAmount: number;
 
         if (mode === "add") {
-          newBalance = (user.demoBalance ?? 0) + Number(amount);
+          newBalance = oldBalance + Number(amount);
+          addedAmount = Number(amount);
         } else {
           newBalance = Number(amount);
+          addedAmount = newBalance - oldBalance; // can be negative if balance decreases
         }
 
+        // Update user balance
         const updatedUser = await tx.user.update({
           where: { id: user.id },
           data: { demoBalance: newBalance },
         });
 
-        // Optional: Create a demo "transaction" log
+        // Create transaction record
         await tx.transaction.create({
           data: {
             userId: user.id,
@@ -74,10 +86,10 @@ export const setDemoBalanceForAllUsers = async (
             coinName: "USD Demo",
             coinSymbol: "USD_DEMO",
             type: TransactionType.DEPOSIT,
-            quantity: mode === "add" ? Number(amount) : newBalance,
+            quantity: addedAmount,
             price: 1,
-            total: mode === "add" ? Number(amount) : newBalance,
-            notes: reason || `Admin demo balance ${mode === "add" ? "addition" : "set"}`,
+            total: addedAmount,
+            notes: reason || `Admin demo balance ${mode === "add" ? "added" : "set"}`,
           },
         });
 
@@ -90,22 +102,35 @@ export const setDemoBalanceForAllUsers = async (
             entityType: "User",
             entityId: user.id,
             changes: {
-              previousBalance: user.demoBalance,
-              newDemoBalance: updatedUser.demoBalance,
-              amount: Number(amount),
+              previousBalance: oldBalance,
+              newDemoBalance: newBalance,
+              amount: addedAmount,
             },
             reason,
           },
         });
+
+        // Add to response history
+        history.push({
+          targetUserId: user.id,
+          email: user.email,
+          previousBalance: oldBalance,
+          newBalance,
+          amountAdded: addedAmount,
+          reason,
+          action: mode,
+        });
       }
     });
 
+    // Return message + history
     res.status(200).json({
       success: true,
       message:
         mode === "add"
           ? `Demo balance of ${amount} added for ${users.length} users`
           : `Demo balance set to ${amount} for ${users.length} users`,
+      data: history, // frontend can render added/set amounts in table
     });
   } catch (error) {
     console.error(error);
