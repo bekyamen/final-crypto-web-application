@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 /**
  * =====================================
- * ADMIN: Get Demo Balance Addition History
+ * ADMIN: Get Demo Balance History
  * =====================================
  */
 export const getDemoBalanceHistory = async (
@@ -22,10 +22,11 @@ export const getDemoBalanceHistory = async (
       return;
     }
 
-    const adminRole = req.user.role;
-
     // 🔒 Only ADMIN or SUPER_ADMIN
-    if (adminRole !== UserRole.ADMIN && adminRole !== UserRole.SUPER_ADMIN) {
+    if (
+      req.user.role !== UserRole.ADMIN &&
+      req.user.role !== UserRole.SUPER_ADMIN
+    ) {
       res.status(403).json({
         success: false,
         message: "Forbidden",
@@ -35,7 +36,12 @@ export const getDemoBalanceHistory = async (
 
     const history = await prisma.auditLog.findMany({
       where: {
-        action: "ADMIN_ADD_DEMO_BALANCE", // ✅ only demo balance actions
+        action: {
+          in: [
+            "ADMIN_ADD_DEMO_BALANCE",
+            "ADMIN_SET_DEMO_BALANCE",
+          ],
+        },
       },
       include: {
         admin: {
@@ -48,7 +54,7 @@ export const getDemoBalanceHistory = async (
           select: {
             id: true,
             email: true,
-            demoBalance: true, // ✅ include demoBalance
+            demoBalance: true,
           },
         },
       },
@@ -63,7 +69,7 @@ export const getDemoBalanceHistory = async (
       data: history,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Demo balance history error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
