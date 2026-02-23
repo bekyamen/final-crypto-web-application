@@ -73,10 +73,10 @@ export const setDemoBalanceForAllUsers = async (
         }
 
         // Update user balance
-        const updatedUser = await tx.user.update({
-          where: { id: user.id },
-          data: { demoBalance: newBalance },
-        });
+        await tx.user.update({
+  where: { id: user.id },
+  data: { demoBalance: newBalance },
+});
 
         // Create transaction record
         await tx.transaction.create({
