@@ -58,33 +58,9 @@ model DepositWallet {
   @@index([coin])
 }
 
-enum WithdrawStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
 
-model WithdrawRequest {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  coin    String
-  network String
-  address String
-  amount  Float
-  fee     Float  @default(0)
 
-  status WithdrawStatus @default(PENDING)
-
-  reviewedBy String?
-  reviewer   User?   @relation("WithdrawReviewedBy", fields: [reviewedBy], references: [id])
-
-  reviewNote String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
 
 // User model for authentication and authorization
 
@@ -392,3 +368,50 @@ model TradeExecution {
 
   @@index([tradeId])
 }
+
+enum WithdrawStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CoinType {
+  BTC
+  ETH
+  USDT
+}
+
+enum NetworkType {
+  BTC
+  ERC20
+  TRC20
+}
+
+
+model WithdrawRequest {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  coin    CoinType
+  network NetworkType
+  address String
+
+  amount  Float
+  fee     Float
+  usdValue Float
+
+  status WithdrawStatus @default(PENDING)
+
+  reviewedBy String?
+  reviewer   User? @relation("WithdrawReviewedBy", fields: [reviewedBy], references: [id])
+
+  reviewNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+

@@ -15,8 +15,8 @@ import adminSimRouter from './routes/adminSimRoutes';
 import superAdminRouter from './routes/superadminroute';
 import adminDepositRoutes from "./routes/adminDepositRoutes"
 import userDepositRoutes from "./routes/userDepositRoutes"
-import adminWithdrawRoutes from "./routes/admin.withdraw.routes";
-import userWithdrawRoutes from "./routes/user.withdraw.routes";
+import adminWithdrawRoutes from "./routes/withdrawRoutes";
+import WithdrawRoutes from "./routes/withdrawRoutes";
 import  getuserReallbalance  from './routes/trade userRoutes';
 import tradeSimRouter from './routes/tradeSimRoutes'; 
 import contactRouter from './routes/contactRoutes';
@@ -94,7 +94,7 @@ app.use('/api/trades', tradeRouter);
 app.use('/api/trade-sim', tradeSimRouter);
 
 app.use("/api/user", userDepositRoutes);
-app.use("/api/user/withdraw", userWithdrawRoutes);
+app.use("/api/withdraw", WithdrawRoutes);
 app.use("/api/user", getuserReallbalance);
 app.use("/api", userbalanceRoutes);
 
