@@ -5,9 +5,8 @@ import { UserRole } from "@prisma/client";
 
 const router = express.Router();
 
-// 🔹 Demo balance history
 router.get(
-  "/demo-balance-history", // ✅ new endpoint
+  "/demo-balance-history",
   authMiddleware,
   roleMiddleware([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
   getDemoBalanceHistory
