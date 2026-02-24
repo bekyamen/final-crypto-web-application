@@ -230,7 +230,7 @@ export const getAllWithdraws = async (req: any, res: any) => {
 };
 
 
-export const getPendingWithdraws = async (req: any, res: any) => {
+export const getPendingWithdraws = async (_req: any, res: any) => {
   try {
     const withdraws = await prisma.withdrawRequest.findMany({
       where: {
