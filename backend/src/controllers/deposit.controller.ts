@@ -6,8 +6,7 @@ import {
   CoinType,
 } from "@prisma/client";
 
-import fs from "fs";
-import path from "path";
+
 
 import { AuthRequest } from "../middlewares/authMiddleware";
 
