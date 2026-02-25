@@ -24,7 +24,11 @@ router.use(roleMiddleware(["SUPER_ADMIN"]));
  * Create or Update Deposit Wallet
  * POST /api/admin/deposit-wallet
  */
-router.post("/deposit-wallet", upload.single("qrImage"), setDepositWallet);
+router.post(
+  "/deposit-wallet",
+  upload.single("qrImage"),
+  setDepositWallet
+);
 
 /**
  * Get all created deposit wallets
@@ -33,45 +37,47 @@ router.post("/deposit-wallet", upload.single("qrImage"), setDepositWallet);
 router.get("/wallets", getAllDepositWallets);
 
 /**
- * Edit existing deposit wallet
- * PUT /api/admin/deposit-wallet/:coin
+ * ✅ Edit existing deposit wallet
+ * MUST include coin + network
+ * PUT /api/admin/deposit-wallet/:coin/:network
  */
-router.put("/deposit-wallet/:coin", upload.single("qrImage"), editDepositWallet);
+router.put(
+  "/deposit-wallet/:coin/:network",
+  upload.single("qrImage"),
+  editDepositWallet
+);
 
 /**
- * Delete deposit wallet
- * DELETE /api/admin/deposit-wallet/:coin
+ * ✅ Delete deposit wallet
+ * DELETE /api/admin/deposit-wallet/:coin/:network
  */
-router.delete("/deposit-wallet/:coin", deleteDepositWallet);
+router.delete(
+  "/deposit-wallet/:coin/:network",
+  deleteDepositWallet
+);
 
 /**
  * Get all pending deposits
- * GET /api/admin/deposit/pending
  */
 router.get("/pending", getPendingDeposits);
 
 /**
  * Approve deposit
- * PUT /api/admin/deposit/approve/:id
  */
 router.put("/approve/:id", approveDeposit);
 
 /**
  * Reject deposit
- * PUT /api/admin/deposit/reject/:id
  */
 router.put("/reject/:id", rejectDeposit);
 
 /**
  * Get a single deposit by ID
- * GET /api/admin/deposit/get/:id
  */
 router.get("/get/:id", getDepositById);
 
 /**
- * Get deposit history (all deposits or filtered)
- * Query params: userId, coin, status
- * GET /api/admin/deposit/history
+ * Get deposit history
  */
 router.get("/history", getDepositHistory);
 

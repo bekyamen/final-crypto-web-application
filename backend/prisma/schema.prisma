@@ -23,7 +23,7 @@ model DepositRequest {
 
   walletId String?
   wallet   DepositWallet? @relation(fields: [walletId], references: [id])
-
+   network        NetworkType  // <-- add this
   coin            String
   amount          Float
   transactionHash String
@@ -43,23 +43,22 @@ model DepositRequest {
   @@index([status])
 }
 
+
 model DepositWallet {
-  id       String  @id @default(cuid())
-  coin     String  @unique
+  id       String      @id @default(cuid())
+  coin     String
   address  String
   qrImage  String
-  isActive Boolean @default(true)
+  network        NetworkType    // now required
+  isActive Boolean     @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  depositRequests DepositRequest[] // ✅ ADD THIS
-
+  depositRequests DepositRequest[]
+  @@unique([coin, network])
   @@index([coin])
 }
-
-
-
 
 
 // User model for authentication and authorization

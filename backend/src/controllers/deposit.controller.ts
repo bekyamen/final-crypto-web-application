@@ -1,17 +1,38 @@
-import {  Response } from "express";
-import { PrismaClient, DepositStatus } from "@prisma/client";
+import { Response } from "express";
+import {
+  PrismaClient,
+  DepositStatus,
+  NetworkType,
+  CoinType,
+} from "@prisma/client";
+
 import fs from "fs";
 import path from "path";
+
 import { AuthRequest } from "../middlewares/authMiddleware";
+
+
 const prisma = new PrismaClient();
 import { getQrUrl } from "../helpers/qrUrl";
 import { getFileUrl } from "../helpers/fileUrl";
 
+
+
+
+
 interface MulterRequest extends AuthRequest {
+
   file?: Express.Multer.File;
 }
 
-const allowedCoins = ["BTC", "ETH", "USDT"];
+
+const isValidCoin = (value: any): value is CoinType => {
+  return Object.values(CoinType).includes(value);
+};
+
+const isValidNetwork = (value: any): value is NetworkType => {
+  return Object.values(NetworkType).includes(value);
+};
 
 
 /**
@@ -23,6 +44,9 @@ const allowedCoins = ["BTC", "ETH", "USDT"];
 /**
  * Helper: Format deposit to include full URLs for wallet QR and proof image
  */
+
+
+
 const formatDeposit = (req: AuthRequest, deposit: any) => ({
   ...deposit,
   proofImage: deposit.proofImage ? getFileUrl(req, deposit.proofImage) : null,
@@ -35,12 +59,17 @@ const formatDeposit = (req: AuthRequest, deposit: any) => ({
 });
 
 
+
 export const setDepositWallet = async (req: MulterRequest, res: Response) => {
   try {
-    const { coin, address } = req.body;
+    const { coin, address, network } = req.body;
 
-    if (!coin || !allowedCoins.includes(coin)) {
+    if (!isValidCoin(coin)) {
       return res.status(400).json({ success: false, message: "Invalid coin type" });
+    }
+
+    if (!isValidNetwork(network)) {
+      return res.status(400).json({ success: false, message: "Invalid network type" });
     }
 
     if (!address) {
@@ -51,42 +80,33 @@ export const setDepositWallet = async (req: MulterRequest, res: Response) => {
       return res.status(400).json({ success: false, message: "QR image required" });
     }
 
-    const existingWallet = await prisma.depositWallet.findUnique({ where: { coin } });
-
-    if (existingWallet?.qrImage) {
-      const oldImagePath = path.join(process.cwd(), existingWallet.qrImage);
-      if (fs.existsSync(oldImagePath)) fs.unlinkSync(oldImagePath);
-    }
-
     const wallet = await prisma.depositWallet.upsert({
-      where: { coin },
+      where: {
+        coin_network: { coin, network },
+      },
       update: {
         address,
         qrImage: `uploads/qr/${req.file.filename}`,
       },
       create: {
         coin,
+        network,
         address,
         qrImage: `uploads/qr/${req.file.filename}`,
       },
     });
 
-    // Return full URL for QR image
-    const walletWithUrl = {
-      ...wallet,
-      qrImage: getQrUrl(req, wallet.qrImage),
-    };
-
     return res.status(200).json({
       success: true,
-      message: `${coin} wallet saved successfully`,
-      data: walletWithUrl,
+      message: `${coin} (${network}) wallet saved successfully`,
+      data: wallet,
     });
   } catch (error) {
     console.error("Set Deposit Wallet Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
 
 /**
  * ===============================
@@ -96,15 +116,34 @@ export const setDepositWallet = async (req: MulterRequest, res: Response) => {
 
 export const getAllDepositWallets = async (req: AuthRequest, res: Response) => {
   try {
-    const wallets = await prisma.depositWallet.findMany({ orderBy: { createdAt: "desc" } });
+    // Fetch all wallets from DB
+    const wallets = await prisma.depositWallet.findMany({
+      orderBy: [
+        { coin: "asc" },
+        { network: "asc" },
+      ],
+    });
 
-    // Return full URL for QR images
+    // Map QR image URLs
     const walletsWithUrl = wallets.map(w => ({
-      ...w,
+      id: w.id,
+      coin: w.coin,
+      network: w.network,
+      address: w.address,
       qrImage: w.qrImage ? getQrUrl(req, w.qrImage) : null,
+      isActive: w.isActive,
+      createdAt: w.createdAt,
+      updatedAt: w.updatedAt,
     }));
 
-    // Disable caching to avoid 304
+    // Optionally, group by coin for frontend convenience
+    const groupedByCoin: Record<string, typeof walletsWithUrl> = {};
+    walletsWithUrl.forEach(wallet => {
+      if (!groupedByCoin[wallet.coin]) groupedByCoin[wallet.coin] = [];
+      groupedByCoin[wallet.coin].push(wallet);
+    });
+
+    // Disable caching
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
@@ -112,7 +151,7 @@ export const getAllDepositWallets = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({
       success: true,
       count: walletsWithUrl.length,
-      data: walletsWithUrl,
+      data: groupedByCoin, // grouped by coin, each coin contains an array of networks
     });
   } catch (error) {
     console.error("Get All Wallets Error:", error);
@@ -125,47 +164,43 @@ export const getAllDepositWallets = async (req: AuthRequest, res: Response) => {
  * ADMIN: Edit Deposit Wallet
  * ===============================
  */
+
 export const editDepositWallet = async (req: MulterRequest, res: Response) => {
   try {
-    const { coin } = req.params;
+    const coin = req.params.coin;
+    const network = req.params.network;
     const { address } = req.body;
 
-    if (!allowedCoins.includes(coin)) {
+    if (!isValidCoin(coin)) {
       return res.status(400).json({ success: false, message: "Invalid coin type" });
     }
 
-    const wallet = await prisma.depositWallet.findUnique({ where: { coin } });
-    if (!wallet) return res.status(404).json({ success: false, message: "Wallet not found" });
-
-    let qrImagePath = wallet.qrImage;
-    if (req.file) {
-      if (wallet.qrImage && fs.existsSync(path.join(process.cwd(), wallet.qrImage))) {
-        fs.unlinkSync(path.join(process.cwd(), wallet.qrImage));
-      }
-      qrImagePath = `uploads/qr/${req.file.filename}`;
+    if (!isValidNetwork(network)) {
+      return res.status(400).json({ success: false, message: "Invalid network type" });
     }
 
-    const updatedWallet = await prisma.depositWallet.update({
-      where: { coin },
+    const wallet = await prisma.depositWallet.findUnique({
+      where: { coin_network: { coin, network } },
+    });
+
+    if (!wallet) {
+      return res.status(404).json({ success: false, message: "Wallet not found" });
+    }
+
+    const updated = await prisma.depositWallet.update({
+      where: { coin_network: { coin, network } },
       data: {
-        address: address || wallet.address,
-        qrImage: qrImagePath,
+        address: address ?? wallet.address,
       },
     });
 
-    // Return full URL for QR image
-    const walletWithUrl = {
-      ...updatedWallet,
-      qrImage: getQrUrl(req, updatedWallet.qrImage),
-    };
-
     return res.status(200).json({
       success: true,
-      message: `${coin} wallet updated successfully`,
-      data: walletWithUrl,
+      message: `${coin} (${network}) updated successfully`,
+      data: updated,
     });
   } catch (error) {
-    console.error("Edit Deposit Wallet Error:", error);
+    console.error("Edit Wallet Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -313,26 +348,30 @@ export const rejectDeposit = async (req: AuthRequest, res: Response) => {
  * ADMIN: Delete Deposit Wallet
  * ===============================
  */
+
 export const deleteDepositWallet = async (req: AuthRequest, res: Response) => {
   try {
-    const { coin } = req.params;
+    const coin = req.params.coin;
+    const network = req.params.network;
 
-    if (!allowedCoins.includes(coin)) {
+    if (!isValidCoin(coin)) {
       return res.status(400).json({ success: false, message: "Invalid coin type" });
     }
 
-    const wallet = await prisma.depositWallet.findUnique({ where: { coin } });
-    if (!wallet) return res.status(404).json({ success: false, message: "Wallet not found" });
-
-    if (wallet.qrImage && fs.existsSync(path.join(process.cwd(), wallet.qrImage))) {
-      fs.unlinkSync(path.join(process.cwd(), wallet.qrImage));
+    if (!isValidNetwork(network)) {
+      return res.status(400).json({ success: false, message: "Invalid network type" });
     }
 
-    await prisma.depositWallet.delete({ where: { coin } });
+    await prisma.depositWallet.delete({
+      where: { coin_network: { coin, network } },
+    });
 
-    return res.status(200).json({ success: true, message: `${coin} deposit wallet deleted successfully` });
+    return res.status(200).json({
+      success: true,
+      message: `${coin} (${network}) deleted successfully`,
+    });
   } catch (error) {
-    console.error("Delete Deposit Wallet Error:", error);
+    console.error("Delete Wallet Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
