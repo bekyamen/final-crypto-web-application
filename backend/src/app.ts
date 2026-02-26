@@ -23,7 +23,7 @@ import contactRouter from './routes/contactRoutes';
 
 import addbalanceRoutes from './routes/add.balance.route';
 import userbalanceRoutes from './routes/user.balance.route';
-
+import identityVerificationRoutes from './routes/identityVerificationRoutes';
 import  getAdminBalanceHistory  from './routes/adminHistoryRoutes';
 import adminUsersRouter from './routes/adminUsersRouter';
 
@@ -114,6 +114,9 @@ app.use('/api/admin', adminSimRouter);
 
 // 🔥 GENERAL admin route LAST
 app.use('/api/admin', adminRouter);
+
+// Identity verification routes
+app.use('/api/identity-verification', identityVerificationRoutes)
 
 
 
