@@ -10,6 +10,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+
+// -------------------------
+// Identity Verification
+// -------------------------
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model IdentityVerification {
+  id             String             @id @default(cuid())
+
+  // Relation to the user who submitted the verification
+  userId         String
+  user           User               @relation("IdentityUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  documentType   String             // identity-card, passport, driver-license
+  fullName       String
+  documentNumber String
+  frontSideUrl   String
+  backSideUrl    String
+
+  // Relation to the admin/super-admin who reviews the verification
+  reviewedBy     String?
+  reviewer       User?              @relation("IdentityReviewedBy", fields: [reviewedBy], references: [id])
+  reviewNote     String?
+
+  status         VerificationStatus @default(PENDING)
+
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+
 enum DepositStatus {
   PENDING
   APPROVED
@@ -62,8 +101,7 @@ model DepositWallet {
 
 
 // User model for authentication and authorization
-
-  model User {
+model User {
   id                  String            @id @default(cuid())
   email               String            @unique
   password            String
@@ -72,9 +110,8 @@ model DepositWallet {
   lastName            String
   phoneNumber         String?
   role                UserRole          @default(USER)
-  
-  
-  isActive          Boolean  @default(true)
+
+  isActive            Boolean           @default(true)
   balance             Float             @default(0)
   totalInvested       Float             @default(0)
   totalEarnings       Float             @default(0)
@@ -83,6 +120,16 @@ model DepositWallet {
   forcePasswordReset  Boolean           @default(false)
   passwordUpdatedAt   DateTime?
   demoBalance         Float             @default(0)
+
+  // -------------------------
+  // Identity Verification Relations
+  // -------------------------
+  identityVerifications         IdentityVerification[] @relation("IdentityUser")        // verifications submitted by this user
+  reviewedIdentityVerifications IdentityVerification[] @relation("IdentityReviewedBy") // verifications reviewed by this user (admin/super-admin)
+
+  // -------------------------
+  // Existing relations
+  // -------------------------
   adminLogs           AuditLog[]        @relation("AdminLogs")
   targetUserLogs      AuditLog[]        @relation("TargetUserLogs")
   reviewedDeposits    DepositRequest[]  @relation("DepositReviewedBy")
@@ -99,7 +146,6 @@ model DepositWallet {
   @@index([phoneNumber])
   @@index([role])
 }
-
 
 
 model AdminContact {

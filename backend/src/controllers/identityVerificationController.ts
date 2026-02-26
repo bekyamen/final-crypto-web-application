@@ -80,6 +80,65 @@ export const submitVerification = async (req: AuthRequest, res: Response) => {
   }
 };
 
+
+// ===============================
+// ADMIN: Get Reviewed Verifications (History)
+// ===============================
+export const getReviewedVerifications = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== "SUPER_ADMIN") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const status = req.query.status as string | undefined; 
+    const skip = (page - 1) * limit;
+
+    const whereCondition: any = {
+      status: { in: ["APPROVED", "REJECTED"] },
+    };
+
+    // Optional filter by status
+    if (status && ["APPROVED", "REJECTED"].includes(status)) {
+      whereCondition.status = status;
+    }
+
+    const [verifications, total] = await Promise.all([
+      prisma.identityVerification.findMany({
+        where: whereCondition,
+        include: {
+          user: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.identityVerification.count({ where: whereCondition }),
+    ]);
+
+    const formatted = verifications.map(v => ({
+      ...v,
+      frontSideUrl: getFileUrl(req, v.frontSideUrl),
+      backSideUrl: getFileUrl(req, v.backSideUrl),
+    }));
+
+    return res.status(200).json({
+      data: formatted,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Get reviewed verifications error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+
 // ===============================
 // USER: Get My Verification Status
 // ===============================
