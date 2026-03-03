@@ -10,8 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 // -------------------------
 // Identity Verification
 // -------------------------
@@ -21,33 +19,47 @@ enum VerificationStatus {
   REJECTED
 }
 
+model Level2Verification {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  selfieUrl         String
+  proofOfAddressUrl String
+  dateOfBirth       DateTime
+  country           String
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model IdentityVerification {
-  id             String             @id @default(cuid())
+  id String @id @default(cuid())
 
   // Relation to the user who submitted the verification
-  userId         String
-  user           User               @relation("IdentityUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("IdentityUser", fields: [userId], references: [id], onDelete: Cascade)
 
-  documentType   String             // identity-card, passport, driver-license
+  documentType   String // identity-card, passport, driver-license
   fullName       String
   documentNumber String
   frontSideUrl   String
   backSideUrl    String
 
   // Relation to the admin/super-admin who reviews the verification
-  reviewedBy     String?
-  reviewer       User?              @relation("IdentityReviewedBy", fields: [reviewedBy], references: [id])
-  reviewNote     String?
+  reviewedBy String?
+  reviewer   User?   @relation("IdentityReviewedBy", fields: [reviewedBy], references: [id])
+  reviewNote String?
 
-  status         VerificationStatus @default(PENDING)
+  status VerificationStatus @default(PENDING)
 
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([status])
 }
-
 
 enum DepositStatus {
   PENDING
@@ -60,9 +72,9 @@ model DepositRequest {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  walletId String?
-  wallet   DepositWallet? @relation(fields: [walletId], references: [id])
-   network        NetworkType  // <-- add this
+  walletId        String?
+  wallet          DepositWallet? @relation(fields: [walletId], references: [id])
+  network         NetworkType // <-- add this
   coin            String
   amount          Float
   transactionHash String
@@ -82,49 +94,49 @@ model DepositRequest {
   @@index([status])
 }
 
-
 model DepositWallet {
   id       String      @id @default(cuid())
   coin     String
   address  String
   qrImage  String
-  network        NetworkType    // now required
+  network  NetworkType // now required
   isActive Boolean     @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   depositRequests DepositRequest[]
+
   @@unique([coin, network])
   @@index([coin])
 }
 
-
 // User model for authentication and authorization
 model User {
-  id                  String            @id @default(cuid())
-  email               String            @unique
-  password            String
-  fundsPassword       String?
-  firstName           String
-  lastName            String
-  phoneNumber         String?
-  role                UserRole          @default(USER)
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  fundsPassword String?
+  firstName     String
+  lastName      String
+  phoneNumber   String?
+  role          UserRole @default(USER)
 
-  isActive            Boolean           @default(true)
-  balance             Float             @default(0)
-  totalInvested       Float             @default(0)
-  totalEarnings       Float             @default(0)
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  forcePasswordReset  Boolean           @default(false)
-  passwordUpdatedAt   DateTime?
-  demoBalance         Float             @default(0)
+  isActive           Boolean   @default(true)
+  balance            Float     @default(0)
+  totalInvested      Float     @default(0)
+  totalEarnings      Float     @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  forcePasswordReset Boolean   @default(false)
+  passwordUpdatedAt  DateTime?
+  demoBalance        Float     @default(0)
 
   // -------------------------
   // Identity Verification Relations
   // -------------------------
-  identityVerifications         IdentityVerification[] @relation("IdentityUser")        // verifications submitted by this user
+  identityVerifications         IdentityVerification[] @relation("IdentityUser")
+  level2Verifications           Level2Verification[] // verifications submitted by this user
   reviewedIdentityVerifications IdentityVerification[] @relation("IdentityReviewedBy") // verifications reviewed by this user (admin/super-admin)
 
   // -------------------------
@@ -146,7 +158,6 @@ model User {
   @@index([phoneNumber])
   @@index([role])
 }
-
 
 model AdminContact {
   id        String   @id @default(cuid())
@@ -292,19 +303,19 @@ model Trade {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type          TradeType
-  cryptoSymbol  String   // ✅ FIXED
-  amountUSD     Float
-  quantity      Float?
+  type         TradeType
+  cryptoSymbol String // ✅ FIXED
+  amountUSD    Float
+  quantity     Float?
 
-  entryPrice Float? 
+  entryPrice Float?
   exitPrice  Float?
 
-  scheduledTime DateTime
-  executedAt    DateTime?
+  scheduledTime  DateTime
+  executedAt     DateTime?
   expirationTime Int?
 
-  isDemo           Boolean       @default(false)
+  isDemo Boolean @default(false)
 
   status            TradeStatus   @default(SCHEDULED)
   outcome           TradeOutcome?
@@ -324,7 +335,6 @@ model Trade {
   @@index([status])
   @@index([cryptoSymbol])
 }
-
 
 enum TradeType {
   BUY
@@ -352,9 +362,9 @@ model TradingSettings {
   winPercentage     Float @default(60) // 60% chance of winning
   lossPercentage    Float @default(30) // 30% chance of losing
   neutralPercentage Float @default(10) // 10% chance of neutral
-  
-  globalMode      String  @default("random") // win, lose, random
-  winProbability  Int     @default(60)
+
+  globalMode       String  @default("random") // win, lose, random
+  winProbability   Int     @default(60)
   // Random outcome toggle
   useRandomOutcome Boolean @default(true)
 
@@ -374,13 +384,12 @@ model TradingSettings {
 }
 
 model UserOverride {
-  id           String    @id @default(cuid())
-  userId       String    @unique
+  id           String  @id @default(cuid())
+  userId       String  @unique
   forceOutcome String?
- 
-  user         User      @relation(fields: [userId], references: [id])
-}
 
+  user User @relation(fields: [userId], references: [id])
+}
 
 // Crypto price cache
 model CryptoPrice {
@@ -432,7 +441,6 @@ enum NetworkType {
   TRC20
 }
 
-
 model WithdrawRequest {
   id     String @id @default(cuid())
   userId String
@@ -442,14 +450,14 @@ model WithdrawRequest {
   network NetworkType
   address String
 
-  amount  Float
-  fee     Float
+  amount   Float
+  fee      Float
   usdValue Float
 
   status WithdrawStatus @default(PENDING)
 
   reviewedBy String?
-  reviewer   User? @relation("WithdrawReviewedBy", fields: [reviewedBy], references: [id])
+  reviewer   User?   @relation("WithdrawReviewedBy", fields: [reviewedBy], references: [id])
 
   reviewNote String?
 
@@ -459,4 +467,3 @@ model WithdrawRequest {
   @@index([userId])
   @@index([status])
 }
-

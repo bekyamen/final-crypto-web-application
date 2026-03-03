@@ -87,6 +87,9 @@ export const createWithdrawRequest = async (req: any, res: any) => {
       });
     }
 
+  
+
+
     // Atomic DB transaction
     await prisma.$transaction([
       // Deduct balance immediately
@@ -136,6 +139,42 @@ export const createWithdrawRequest = async (req: any, res: any) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getUserWithdrawTotal = async (req: any, res: any) => {
+  try {
+    const userId = req.user.id;
+
+    // Only count APPROVED withdrawals
+    const withdrawals = await prisma.withdrawRequest.findMany({
+      where: {
+        userId,
+        status: WithdrawStatus.APPROVED,
+      },
+      select: {
+        usdValue: true,
+      },
+    });
+
+    const totalWithdraw = withdrawals.reduce(
+      (sum, w) => sum + Number(w.usdValue),
+      0
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        totalWithdraw,
+      },
+    });
+  } catch (error) {
+    console.error("Get User Withdraw Total Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
 
 export const getUserWithdraws = async (req: any, res: any) => {
   try {

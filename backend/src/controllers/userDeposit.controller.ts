@@ -84,6 +84,83 @@ export const getDepositWallet = async (req: Request, res: Response) => {
   }
 };
 
+
+/**
+ * ======================================================
+ * USER: Get Deposit History
+ * GET /api/user/deposit/history
+ * ======================================================
+ */
+export const getDepositHistory = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const deposits = await prisma.depositRequest.findMany({
+      where: {
+        userId: req.user!.id,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    const formatted = deposits.map((deposit) => ({
+      ...deposit,
+      proofImage: getFullUrl(req, deposit.proofImage),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: formatted.length,
+      data: formatted,
+    });
+  } catch (error) {
+    console.error("Get Deposit History Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+
+/**
+ * ======================================================
+ * USER: Get Total Approved Deposits
+ * GET /api/user/deposit/total
+ * ======================================================
+ */
+export const getTotalDeposits = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const total = await prisma.depositRequest.aggregate({
+      where: {
+        userId: req.user!.id,
+        status: "APPROVED", // Only approved deposits
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalDeposits: total._sum.amount || 0,
+      },
+    });
+  } catch (error) {
+    console.error("Get Total Deposits Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
 /**
  * ======================================================
  * USER: Create Deposit Request

@@ -8,7 +8,8 @@ import {
   getUserWithdrawById,
   getAllWithdraws,
   getPendingWithdraws,
- getWithdrawalHistory,
+  getWithdrawalHistory,
+  getUserWithdrawTotal,   // ✅ ADD THIS
 } from "../controllers/withdrawController";
 
 import { authMiddleware, roleMiddleware } from "../middlewares/authMiddleware";
@@ -45,6 +46,13 @@ router.get(
   roleMiddleware([UserRole.SUPER_ADMIN]),
   getAllWithdraws
 );
+
+router.get(
+  "/total",
+  authMiddleware,
+  getUserWithdrawTotal
+);
+
 
 // Get only pending withdraw requests
 router.get(

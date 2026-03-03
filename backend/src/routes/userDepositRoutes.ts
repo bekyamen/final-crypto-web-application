@@ -2,6 +2,8 @@ import express from "express";
 import {
   getDepositWallet,
   createDepositRequest,
+  getDepositHistory,
+  getTotalDeposits,
 } from "../controllers/userDeposit.controller";
 import { upload } from "../middlewares/upload";
 import { authMiddleware } from "../middlewares/authMiddleware";
@@ -16,6 +18,9 @@ router.get(
   authMiddleware,
   getDepositWallet
 );
+
+router.get("/deposit/history", authMiddleware, getDepositHistory);
+router.get("/deposit/total", authMiddleware, getTotalDeposits);
 
 /**
  * Create Deposit Request

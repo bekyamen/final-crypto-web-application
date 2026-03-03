@@ -6,6 +6,9 @@ import {
   getPendingVerifications,
   reviewVerification,
   getReviewedVerifications,
+  submitLevel2Verification,
+  getMyLevel2Verification,
+  getLevel2History,
 } from "../controllers/identityVerificationController";
 import { authMiddleware, roleMiddleware } from "../middlewares/authMiddleware";
 
@@ -44,5 +47,36 @@ router.get(
   roleMiddleware(["SUPER_ADMIN"]),
   getReviewedVerifications
 );
+
+// Submit Level 2
+router.post(
+  "/level2/submit",
+  authMiddleware,
+  upload.fields([
+    { name: "selfie", maxCount: 1 },
+    { name: "proofOfAddress", maxCount: 1 },
+  ]),
+  submitLevel2Verification
+);
+
+// Get My Level 2
+router.get(
+  "/level2/me",
+  authMiddleware,
+  getMyLevel2Verification
+);
+
+/* =====================================================
+   SUPER ADMIN ROUTES
+===================================================== */
+
+// Get Level 2 Full History
+router.get(
+  "/level2/history",
+  authMiddleware,
+  roleMiddleware(["SUPER_ADMIN"]),
+  getLevel2History
+);
+
 
 export default router;

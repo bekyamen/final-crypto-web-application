@@ -15,6 +15,8 @@ interface MulterRequest extends AuthRequest {
   files?: {
     frontSide?: Express.Multer.File[];
     backSide?: Express.Multer.File[];
+    selfie?: Express.Multer.File[];
+    proofOfAddress?: Express.Multer.File[];
   };
 }
 
@@ -80,6 +82,184 @@ export const submitVerification = async (req: AuthRequest, res: Response) => {
   }
 };
 
+
+/* =====================================================
+   USER: SUBMIT LEVEL 2 (AUTO COMPLETE)
+===================================================== */
+export const submitLevel2Verification = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const multerReq = req as MulterRequest;
+    const userId = req.user?.id;
+    const { dateOfBirth, country } = req.body;
+
+    if (!userId)
+      return res.status(401).json({ message: "User not authenticated" });
+
+    const selfieFile = multerReq.files?.selfie?.[0];
+    const addressFile = multerReq.files?.proofOfAddress?.[0];
+
+    if (!selfieFile || !addressFile || !dateOfBirth || !country) {
+      return res.status(400).json({
+        message: "All fields are required",
+      });
+    }
+
+    // Level 1 must be approved first
+    const level1 = await prisma.identityVerification.findFirst({
+      where: { userId, status: "APPROVED" },
+    });
+
+    if (!level1)
+      return res.status(400).json({
+        message: "Level 1 must be approved first",
+      });
+
+    // Prevent duplicate Level 2
+    const existing = await prisma.level2Verification.findUnique({
+      where: { userId },
+    });
+
+    if (existing)
+      return res.status(400).json({
+        message: "Level 2 already completed",
+      });
+
+    // Create upload folder
+    const uploadFolder = path.join(__dirname, "../../uploads/level2");
+    if (!fs.existsSync(uploadFolder)) {
+      fs.mkdirSync(uploadFolder, { recursive: true });
+    }
+
+    const selfieFilename = `${Date.now()}-${selfieFile.originalname}`;
+    const addressFilename = `${Date.now()}-${addressFile.originalname}`;
+
+    fs.writeFileSync(
+      path.join(uploadFolder, selfieFilename),
+      selfieFile.buffer
+    );
+
+    fs.writeFileSync(
+      path.join(uploadFolder, addressFilename),
+      addressFile.buffer
+    );
+
+    // Save directly as completed (no status field needed)
+    const verification = await prisma.level2Verification.create({
+      data: {
+        userId,
+        selfieUrl: `/uploads/level2/${selfieFilename}`,
+        proofOfAddressUrl: `/uploads/level2/${addressFilename}`,
+        dateOfBirth: new Date(dateOfBirth),
+        country,
+      },
+    });
+
+    return res.status(201).json({
+      message: "Level 2 verification completed successfully",
+      verification: {
+        ...verification,
+        selfieUrl: getFileUrl(req, verification.selfieUrl),
+        proofOfAddressUrl: getFileUrl(req, verification.proofOfAddressUrl),
+      },
+    });
+  } catch (error: any) {
+    console.error("Level 2 submit error:", error);
+    return res.status(500).json({
+      message: "Internal server error",
+      details: error.message,
+    });
+  }
+};
+
+/* =====================================================
+   USER: GET MY LEVEL 2
+===================================================== */
+export const getMyLevel2Verification = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId)
+      return res.status(401).json({ message: "User not authenticated" });
+
+    const verification = await prisma.level2Verification.findUnique({
+      where: { userId },
+    });
+
+    if (!verification)
+      return res.status(200).json({ verification: null });
+
+    return res.status(200).json({
+      verification: {
+        ...verification,
+        selfieUrl: getFileUrl(req, verification.selfieUrl),
+        proofOfAddressUrl: getFileUrl(req, verification.proofOfAddressUrl),
+      },
+    });
+  } catch (error) {
+    console.error("Get my Level 2 error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+/* =====================================================
+   SUPER ADMIN: GET LEVEL 2 HISTORY
+===================================================== */
+export const getLevel2History = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
+    if (req.user?.role !== "SUPER_ADMIN")
+      return res.status(403).json({ message: "Access denied" });
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const [verifications, total] = await Promise.all([
+      prisma.level2Verification.findMany({
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.level2Verification.count(),
+    ]);
+
+    const formatted = verifications.map((v) => ({
+      ...v,
+      selfieUrl: getFileUrl(req, v.selfieUrl),
+      proofOfAddressUrl: getFileUrl(req, v.proofOfAddressUrl),
+    }));
+
+    return res.status(200).json({
+      data: formatted,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Level 2 history error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 // ===============================
 // ADMIN: Get Reviewed Verifications (History)
