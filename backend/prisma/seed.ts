@@ -6,63 +6,78 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
-  // --- 0️⃣ Create Super Admin user ---
+  // --- 0️⃣ Create or update Super Admin user ---
   const hashedSuperAdminPassword = await bcrypt.hash('superadmin123', 10);
   await prisma.user.upsert({
     where: { email: 'superadmin@crypto.local' },
-    update: {},
+    update: {
+      password: hashedSuperAdminPassword,
+      firstName: 'Super',
+      lastName: 'Admin',
+      role: UserRole.SUPER_ADMIN,
+    },
     create: {
       email: 'superadmin@crypto.local',
       password: hashedSuperAdminPassword,
       firstName: 'Super',
       lastName: 'Admin',
-      role: UserRole.SUPER_ADMIN, // ✅ Use enum
+      role: UserRole.SUPER_ADMIN,
     },
   });
-  console.log('✅ Super Admin user created: superadmin@crypto.local');
+  console.log('✅ Super Admin user created/updated: superadmin@crypto.local');
 
-  // --- 1️⃣ Create Admin user ---
+  // --- 1️⃣ Create or update Admin user ---
   const hashedAdminPassword = await bcrypt.hash('admin123456', 10);
   await prisma.user.upsert({
     where: { email: 'admin@crypto.local' },
-    update: {},
+    update: {
+      password: hashedAdminPassword,
+      firstName: 'Admin',
+      lastName: 'User',
+      role: UserRole.ADMIN,
+    },
     create: {
       email: 'admin@crypto.local',
       password: hashedAdminPassword,
       firstName: 'Admin',
       lastName: 'User',
-      role: UserRole.ADMIN, // ✅ Use enum
+      role: UserRole.ADMIN,
     },
   });
-  console.log('✅ Admin user created: admin@crypto.local');
+  console.log('✅ Admin user created/updated: admin@crypto.local');
 
-  // --- 2️⃣ Create test users ---
+  // --- 2️⃣ Create or update test users ---
   const testUsers = [];
   for (let i = 1; i <= 3; i++) {
     const hashedPassword = await bcrypt.hash('TestPass123', 10);
     const user = await prisma.user.upsert({
       where: { email: `user${i}@example.com` },
-      update: {},
+      update: {
+        password: hashedPassword,
+        firstName: 'Test',
+        lastName: `User ${i}`,
+        role: UserRole.USER,
+      },
       create: {
         email: `user${i}@example.com`,
         password: hashedPassword,
         firstName: 'Test',
         lastName: `User ${i}`,
-        role: UserRole.USER, // ✅ Use enum
+        role: UserRole.USER,
       },
     });
     testUsers.push(user);
-    console.log(`✅ Test user created: ${user.email}`);
+    console.log(`✅ Test user created/updated: ${user.email}`);
   }
 
-  // --- 3️⃣ Create portfolios and assets ---
+  // --- 3️⃣ Create or update portfolios and assets ---
   for (const user of testUsers) {
     const portfolio = await prisma.portfolio.upsert({
       where: { userId: user.id },
-      update: {},
+      update: {}, // keep existing totals for now
       create: { userId: user.id },
     });
-    console.log(`✅ Portfolio created for user: ${user.email}`);
+    console.log(`✅ Portfolio created/updated for user: ${user.email}`);
 
     const coins = [
       { coinId: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', quantity: 0.5, price: 45000 },
@@ -73,8 +88,24 @@ async function main() {
     for (const coin of coins) {
       const totalBuyValue = coin.quantity * coin.price;
 
-      await prisma.portfolioAsset.create({
-        data: {
+      // upsert portfolio asset
+      await prisma.portfolioAsset.upsert({
+        where: {
+          portfolioId_coinId: {
+            portfolioId: portfolio.id,
+            coinId: coin.coinId,
+          },
+        },
+        update: {
+          quantity: coin.quantity,
+          averageBuyPrice: coin.price,
+          currentPrice: coin.price,
+          totalBuyValue,
+          totalCurrentValue: totalBuyValue,
+          pnl: 0,
+          pnlPercentage: 0,
+        },
+        create: {
           portfolioId: portfolio.id,
           coinId: coin.coinId,
           coinName: coin.name,
@@ -89,6 +120,7 @@ async function main() {
         },
       });
 
+      // create transaction (always create a new record)
       await prisma.transaction.create({
         data: {
           userId: user.id,
@@ -105,7 +137,7 @@ async function main() {
       });
     }
 
-    // Update portfolio totals
+    // update portfolio totals
     const assets = await prisma.portfolioAsset.findMany({ where: { portfolioId: portfolio.id } });
     const totalValue = assets.reduce((sum, a) => sum + a.totalCurrentValue, 0);
     const totalInvested = assets.reduce((sum, a) => sum + a.totalBuyValue, 0);
