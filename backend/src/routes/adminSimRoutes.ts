@@ -12,7 +12,6 @@ adminSimRouter.get('/settings', adminSimController.getSettings);
 adminSimRouter.get('/stats', adminSimController.getAdminStats);
 adminSimRouter.post('/reset', adminSimController.resetData);
 
-// NEW route
-adminSimRouter.get('/users', adminSimController.getUsersWithMode);
+
 
 export default adminSimRouter;

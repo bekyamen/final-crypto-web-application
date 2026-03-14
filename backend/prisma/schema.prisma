@@ -149,7 +149,7 @@ model User {
   portfolio           Portfolio?
   trades              Trade[]
   transactions        Transaction[]
-  userOverride        UserOverride?
+  userOverrides UserOverride[]
   userWallets         UserWallet[]
   reviewedWithdrawals WithdrawRequest[] @relation("WithdrawReviewedBy")
   withdrawRequests    WithdrawRequest[]
@@ -354,41 +354,52 @@ enum TradeOutcome {
   NEUTRAL
 }
 
+enum OverrideTradeType {
+  REAL
+  DEMO
+}
+
 // Admin settings for trade outcomes
+
+
 model TradingSettings {
   id String @id @default(cuid())
 
-  // Win/Loss control
-  winPercentage     Float @default(60) // 60% chance of winning
-  lossPercentage    Float @default(30) // 30% chance of losing
-  neutralPercentage Float @default(10) // 10% chance of neutral
+  tradeType String @default("DEMO") @unique
 
-  globalMode       String  @default("random") // win, lose, random
-  winProbability   Int     @default(60)
-  // Random outcome toggle
+  winPercentage     Float @default(60)
+  lossPercentage    Float @default(30)
+  neutralPercentage Float @default(10)
+
+  globalMode     String @default("random")
+  winProbability Int    @default(60)
+
   useRandomOutcome Boolean @default(true)
 
-  // Price variation
-  priceVariation Float @default(2) // +/- 2% price variation
+  priceVariation Float @default(2)
 
-  // Trading hours
   tradingEnabled Boolean @default(true)
   minTradeAmount Float   @default(10)
   maxTradeAmount Float   @default(100000)
 
-  // Admin control
-  adminOverride Boolean @default(false) // Admin can override outcomes
+  adminOverride Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model UserOverride {
-  id           String  @id @default(cuid())
-  userId       String  @unique
-  forceOutcome String?
+  id           String            @id @default(cuid())
+  userId       String
+  tradeType    OverrideTradeType @default(REAL)
+  forceOutcome TradeOutcome?
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tradeType])
+  @@index([userId])
 }
 
 // Crypto price cache

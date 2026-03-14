@@ -1,73 +1,48 @@
 import { Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { tradeEngine } from '../services/tradeEngine';
+import { AdminMode, AdminSettings, UserOverride } from '../types/trade.types';
 
-class AdminUsersController {
+export class AdminUsersController {
   /**
    * GET /api/admin/users-with-mode
    * Returns all users with their active override mode or global mode if none
    */
   getUsersWithMode = async (_req: Request, res: Response) => {
     try {
-      // Fetch all users with their UserOverride relation
-      const users = await prisma.user.findMany({
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          balance: true,
-          demoBalance: true,
-          createdAt: true,
-          updatedAt: true,
-          userOverride: true, // ✅ relation
-        },
-        orderBy: { email: 'asc' },
+      // Fetch all users + overrides
+      const users = await prisma.user.findMany({ include: { userOverrides: true } });
+
+      const adminSettings: AdminSettings = tradeEngine.getAdminSettings();
+
+      const mapped = users.map(user => {
+        // Check for override on REAL trades
+        const override = user.userOverrides?.find(
+          (o: any) => o.tradeType === 'REAL'
+        ) as (UserOverride & { tradeType: string }) | undefined;
+
+        let mode: 'win' | 'lose' | 'random' = 'random';
+
+        if (override?.forceOutcome) {
+          // Fix: Compare with the correct enum values
+          mode = override.forceOutcome === 'win' ? 'win' : 'lose';
+        } else {
+          // Use the correct property name - REAL (uppercase)
+          const gm: AdminMode = adminSettings.REAL.globalMode; // Changed from adminSettings[typeKey]
+
+          if (gm === 'WIN') mode = 'win';
+          else if (gm === 'LOSS') mode = 'lose';
+          else mode = 'random';
+        }
+
+        return { ...user, mode };
       });
 
-      // Map users to include active override mode or global mode
-      const mappedUsers = users.map(user => {
-  let mode: 'win' | 'lose' | 'random' = 'random';
-
-  if (user.userOverride) {
-    // Apply override directly (no expiresAt anymore)
-    mode = user.userOverride.forceOutcome as 'win' | 'lose';
-  } else {
-    // Fallback to global mode
-    const globalMode = tradeEngine.getAdminSettings().globalMode;
-    mode = ['win', 'lose', 'random'].includes(globalMode)
-      ? (globalMode as 'win' | 'lose' | 'random')
-      : 'random';
-  }
-
-  return {
-    id: user.id,
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    role: user.role,
-    balance: user.balance,
-    demoBalance: user.demoBalance,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-    mode,
-  };
-});
-
-      res.status(200).json({
-        success: true,
-        message: 'Users retrieved successfully',
-        data: {
-          total: mappedUsers.length,
-          users: mappedUsers,
-        },
-      });
-    } catch (err) {
-      console.error('[AdminUsersController] getUsersWithMode error:', err);
+      res.json({ success: true, data: { users: mapped } });
+    } catch (error) {
       res.status(500).json({
         success: false,
-        message: err instanceof Error ? err.message : 'Unknown error',
+        message: error instanceof Error ? error.message : 'Server error',
       });
     }
   };

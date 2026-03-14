@@ -1,12 +1,19 @@
 // src/routes/tradeSimRouter.ts
-import { Router } from 'express';
-import { tradeSimController } from '../controllers/tradeSimController';
+import { Router } from 'express'
+import { tradeSimController } from '../controllers/tradeSimController'
 
-export const tradeSimRouter = Router();
+export const tradeSimRouter = Router()
 
-tradeSimRouter.post('/', tradeSimController.createTrade);
-tradeSimRouter.get('/user/:userId', tradeSimController.getUserTrades);
-tradeSimRouter.get('/', tradeSimController.getAllTrades);
-tradeSimRouter.get('/stats', tradeSimController.getStats);
+// execute trade
+tradeSimRouter.post('/', tradeSimController.createTrade)
 
-export default tradeSimRouter;
+// user trades
+tradeSimRouter.get('/user/:userId', tradeSimController.getUserTrades)
+
+// all trades
+tradeSimRouter.get('/', tradeSimController.getAllTrades)
+
+// statistics
+tradeSimRouter.get('/stats', tradeSimController.getStats)
+
+export default tradeSimRouter
