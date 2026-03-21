@@ -45,7 +45,7 @@ export class TradeEngine {
     },
   };
 
-  private betConfig: BetConfig = {};
+  private betConfig: Record<number, { winProbability: number }> = {};
 
   /* ================= ADMIN METHODS ================= */
   setGlobalMode(mode: AdminMode, tradeType: 'DEMO' | 'REAL'): void {
@@ -108,43 +108,54 @@ export class TradeEngine {
   }
 
   /* ================= TRADE LOGIC ================= */
-  async calculateOutcome(userId: string, isDemo: boolean): Promise<TradeOutcome> {
-    const tradeType = isDemo ? 'DEMO' : 'REAL';
-    const settings = this.adminSettings[tradeType];
-    const override = settings.userOverrides.get(userId);
+  
+  async calculateOutcome(
+  userId: string,
+  isDemo: boolean,
+  expirationTime: number
+): Promise<TradeOutcome> {
+  const tradeType = isDemo ? 'DEMO' : 'REAL';
+  const settings = this.adminSettings[tradeType];
 
-    if (override?.forceOutcome) {
-      return override.forceOutcome === 'win' ? 'WIN' : 'LOSS';
-    }
-
-    if (settings.globalMode === 'WIN') return 'WIN';
-    if (settings.globalMode === 'LOSS') return 'LOSS';
-
-    const rand = Math.random() * 100;
-    return rand <= settings.winProbability ? 'WIN' : 'LOSS';
+  const override = settings.userOverrides.get(userId);
+  if (override?.forceOutcome) {
+    return override.forceOutcome === 'win' ? 'WIN' : 'LOSS';
   }
 
-  calculateReturnedAmount(amount: number, expirationTime: number, outcome: TradeOutcome) {
-    const custom = this.betConfig[expirationTime];
-    const percent = custom
-      ? outcome === 'WIN'
-        ? custom.profitPercent / 100
-        : custom.lossPercent / 100
-      : this.PERCENTAGE_MAP[expirationTime];
+  if (settings.globalMode === 'WIN') return 'WIN';
+  if (settings.globalMode === 'LOSS') return 'LOSS';
 
-    if (!percent) throw new Error('Invalid expiration time');
+  // NEW: probability per expiration time
+  const custom = this.betConfig[expirationTime];
+  const winProbability = custom?.winProbability ?? settings.winProbability;
 
-    const value = Math.round(amount * percent * 100) / 100;
+  const rand = Math.random() * 100;
+  return rand <= winProbability ? 'WIN' : 'LOSS';
+}
 
-    return {
-      returnedAmount: value,
-      profitLossAmount: value,
-      profitLossPercent: outcome === 'WIN' ? percent * 100 : -percent * 100,
-    };
-  }
+ 
+calculateReturnedAmount(amount: number, expirationTime: number, outcome: TradeOutcome) {
+  const percent = this.PERCENTAGE_MAP[expirationTime];
+
+  if (!percent) throw new Error('Invalid expiration time');
+
+  const value = Math.round(amount * percent * 100) / 100;
+
+  return {
+    returnedAmount: value,
+    profitLossAmount: value,
+    profitLossPercent: outcome === 'WIN' ? percent * 100 : -percent * 100,
+  };
+}
 
   async executeTrade(tradeRequest: TradeRequest): Promise<TradeResponse> {
-    const outcome = await this.calculateOutcome(tradeRequest.userId, tradeRequest.isDemo);
+    
+    const outcome = await this.calculateOutcome(
+  tradeRequest.userId,
+  tradeRequest.isDemo,
+  tradeRequest.expirationTime
+);
+
     const { returnedAmount, profitLossAmount, profitLossPercent } = this.calculateReturnedAmount(
       tradeRequest.amount,
       tradeRequest.expirationTime,
@@ -216,11 +227,12 @@ export class TradeEngine {
   }
 
   /* ================= BET CONFIG ================= */
-  updateBetConfig(expirationTime: number, profitPercent: number, lossPercent: number): void {
-    if (!this.betConfig) this.betConfig = {};
+  
+  updateBetConfig(expirationTime: number, winProbability: number): void {
+  if (!this.betConfig) this.betConfig = {};
 
-    this.betConfig[expirationTime] = { profitPercent, lossPercent };
-  }
+  this.betConfig[expirationTime] = { winProbability };
+}
 }
 
 export const tradeEngine = new TradeEngine();
