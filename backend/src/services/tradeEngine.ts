@@ -5,7 +5,7 @@ import {
   TradeOutcome,
   AdminMode,
   TradeResponse,
-  BetConfig,
+  
 } from '../types/trade.types';
 
 const prisma = new PrismaClient();

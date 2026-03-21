@@ -86,21 +86,28 @@ setWinProbability = (req: Request, res: Response): void => {
 };
 
   /** ==================== BET CONFIG ==================== */
+  
   updateBetConfig = (req: Request, res: Response): void => {
-    const { expirationTime, profitPercent, lossPercent } = req.body;
+  const { expirationTime, winProbability } = req.body;
 
-    if (!ALLOWED_EXPIRATION_TIMES.includes(expirationTime)) {
-      res.status(400).json({ success: false, message: 'Invalid expirationTime' });
-      return;
-    }
+  if (!ALLOWED_EXPIRATION_TIMES.includes(expirationTime)) {
+    res.status(400).json({ success: false, message: 'Invalid expirationTime' });
+    return;
+  }
 
-    tradeEngine.updateBetConfig(expirationTime, profitPercent, lossPercent);
-    res.json({
-      success: true,
-      message: 'Bet config updated',
-      data: { expirationTime, profitPercent, lossPercent },
-    });
-  };
+  if (winProbability < 0 || winProbability > 100) {
+    res.status(400).json({ success: false, message: 'Win probability must be 0-100' });
+    return;
+  }
+
+  tradeEngine.updateBetConfig(expirationTime, winProbability);
+
+  res.json({
+    success: true,
+    message: 'Win probability updated for this expiration time',
+    data: { expirationTime, winProbability },
+  });
+};
 
   /** ==================== ADMIN SETTINGS ==================== */
    getSettings = (_req: Request, res: Response) => {
